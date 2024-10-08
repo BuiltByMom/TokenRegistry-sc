@@ -3,123 +3,162 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "src/TokenRegistry.sol";
+import "src/TokentrollerV1.sol";
 
 contract TokenRegistryTest is Test {
     TokenRegistry tokenRegistry;
-    address council = address(1);
-    address nonCouncil = address(2);
-    address tokenAddress = address(3);
-    uint256 autoApprovalTime = 1 weeks;
+    TokentrollerV1 tokentroller;
+    address owner = address(1);
+    address nonOwner = address(2);
+    address nonOwner2 = address(3);
+    address tokenAddress = address(4);
 
     function setUp() public {
-        tokenRegistry = new TokenRegistry(council, autoApprovalTime);
+        tokentroller = new TokentrollerV1(owner);
+        tokenRegistry = TokenRegistry(tokentroller.tokenRegistry());
     }
 
     function testAddToken() public {
-        vm.prank(nonCouncil);
-        tokenRegistry.addToken("Test Token", "A sample token", "https://example.com/logo.png", "TTK", tokenAddress, 18);
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
 
-        (
-            string memory name,
-            string memory description,
-            string memory tokenLogoURL,
-            string memory symbol,
-            uint8 decimals,
-            bool isPending
-        ) = tokenRegistry.getToken(tokenAddress);
+        (,, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status,) = tokenRegistry.tokens(tokenAddress);
 
         assertEq(name, "Test Token");
-        assertEq(description, "A sample token");
-        assertEq(tokenLogoURL, "https://example.com/logo.png");
         assertEq(symbol, "TTK");
+        assertEq(logoURI, "https://example.com/logo.png");
         assertEq(decimals, 18);
-        assertEq(isPending, true);
+        assertEq(status, 0);
     }
 
-    function testApproveToken() public {
-        vm.prank(nonCouncil);
-        tokenRegistry.addToken("Test Token", "A sample token", "https://example.com/logo.png", "TTK", tokenAddress, 18);
+    function testUpdateToken() public {
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+ 
+        vm.prank(nonOwner);
+        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9);
 
-        vm.prank(council);
-        tokenRegistry.approveToken(tokenAddress);
+        (,,string memory name, string memory logoURI, string memory symbol, uint8 decimals,,) = tokenRegistry.tokens(tokenAddress);
 
-        (, , , , , bool isPending) = tokenRegistry.getToken(tokenAddress);
-        assertEq(isPending, false);
+        assertEq(name, "Updated Token", "Name should be updeated");
+        assertEq(symbol, "UTK", "Symbol should be updated");
+        assertEq(logoURI, "https://example.com/new_logo.png", "Logo URI should be updated");
+        assertEq(decimals, 9, "Decimals should be updated");
+    }
+
+    function testFastTrackToken() public {
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+
+        vm.prank(owner);
+        tokenRegistry.fastTrackToken(tokenAddress);
+
+        (,,,,,,uint8 status,) = tokenRegistry.tokens(tokenAddress);
+        assertEq(status, 1, 'Token should be fast-tracked');
     }
 
     function testRejectToken() public {
-        vm.prank(nonCouncil);
-        tokenRegistry.addToken("Test Token", "A sample token", "https://example.com/logo.png", "TTK", tokenAddress, 18);
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
 
-        vm.prank(council);
+        vm.prank(owner);
         tokenRegistry.rejectToken(tokenAddress);
 
-        // Expect revert because token does not exist after rejection
-        vm.expectRevert("Token does not exist");
-        tokenRegistry.getToken(tokenAddress);
+        (,,,,,,uint8 status,) = tokenRegistry.tokens(tokenAddress);
+
+        assertEq(status, 2);
     }
 
-    function testUpdateCouncil() public {
-        address newCouncil = address(4);
-        vm.prank(council);
-        tokenRegistry.updateCouncil(newCouncil);
-        assertEq(tokenRegistry.council(), newCouncil);
+    function testUpdateTokentroller() public {
+        address newTokentroller = address(4);
+        vm.prank(owner);
+        tokentroller.updateRegistryTokentroller(newTokentroller);
+
+        assertEq(tokenRegistry.tokentroller(), newTokentroller);
     }
 
-    function testAutoApproveToken() public {
-        vm.prank(nonCouncil);
-        tokenRegistry.addToken("Test Token", "A sample token", "https://example.com/logo.png", "TTK", tokenAddress, 18);
-
-        // Fast-forward time beyond auto-approval time
-        vm.warp(block.timestamp + autoApprovalTime + 1);
-
-        tokenRegistry.autoApproveTokens();
-
-        (, , , , , bool isPending) = tokenRegistry.getToken(tokenAddress);
-        assertEq(isPending, false);
-    }
-
-    function testListTokensPagination() public {
-        // Add multiple tokens
+    function testListAllTokens() public {
         for (uint256 i = 0; i < 5; i++) {
-            vm.prank(nonCouncil);
-            tokenRegistry.addToken(
-                string(abi.encodePacked("Token ", uintToStr(i))),
-                "A sample token",
-                "https://example.com/logo.png",
-                string(abi.encodePacked("TK", uintToStr(i))),
-                address(uint160(i + 10)),
-                18
-            );
+            vm.prank(nonOwner);
+            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18);
         }
 
-        TokenRegistry.Token[] memory page1 = tokenRegistry.listTokens(0, 2);
-        assertEq(page1.length, 2);
-        assertEq(page1[0].name, "Token 0");
-        assertEq(page1[1].name, "Token 1");
-
-        TokenRegistry.Token[] memory page2 = tokenRegistry.listTokens(1, 2);
-        assertEq(page2.length, 2);
-        assertEq(page2[0].name, "Token 2");
-        assertEq(page2[1].name, "Token 3");
+        (TokenRegistry.Token[] memory tokens, uint256 finalIndex) = tokenRegistry.listAllTokens(0, 3);
+        assertEq(tokens.length, 3);
+        assertEq(finalIndex, 2);
+        assertEq(tokens[0].name, "Token 0");
+        assertEq(tokens[2].name, "Token 2");
     }
 
-    function testGetLatestIndex() public {
-        // Add multiple tokens
-        for (uint256 i = 0; i < 3; i++) {
-            vm.prank(nonCouncil);
-            tokenRegistry.addToken(
-                string(abi.encodePacked("Token ", uintToStr(i))),
-                "A sample token",
-                "https://example.com/logo.png",
-                string(abi.encodePacked("TK", uintToStr(i))),
-                address(uint160(i + 10)),
-                18
-            );
+    function testListApprovedTokens() public {
+        for (uint256 i = 0; i < 5; i++) {
+            vm.prank(nonOwner);
+            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18);
+            if (i % 2 == 0) {
+                vm.prank(owner);
+                tokenRegistry.fastTrackToken(address(uint160(i + 10)));
+            }
         }
 
-        uint256 latestIndex = tokenRegistry.getLatestIndex();
-        assertEq(latestIndex, 3);
+        (TokenRegistry.Token[] memory tokens, uint256 finalIndex) = tokenRegistry.listApprovedTokens(0, 3);
+        assertEq(tokens.length, 3);
+        assertEq(finalIndex, 4);
+        assertEq(tokens[0].name, "Token 0");
+        assertEq(tokens[1].name, "Token 2");
+        assertEq(tokens[2].name, "Token 4");
+    }
+
+    function testTokenCount() public {
+        for (uint256 i = 0; i < 5; i++) {
+            vm.prank(nonOwner);
+            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18);
+        }
+
+        assertEq(tokenRegistry.tokenCount(), 5);
+    }
+
+    function testAcceptTokenEdit() public {
+        // Add a token
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+
+        // Suggest an update
+        vm.prank(nonOwner2);
+        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9);
+
+        // Fast forward time to pass the optimistic approval period
+        vm.warp(block.timestamp + tokentroller.delayToOptimisticApproval() + 1);
+
+        // Accept the edit
+        vm.prank(owner);
+        tokenRegistry.acceptTokenEdit(tokenAddress, 1);
+
+        // Retrieve the updated token
+        (,, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status,) = tokenRegistry.tokens(tokenAddress);
+
+        // Assert the token details have been updated
+        assertEq(name, "Updated Token", 'Name should be updated');
+        assertEq(symbol, "UTK", 'Symbol should be updated');
+        assertEq(logoURI, "https://example.com/new_logo.png", 'Logo URI should be updated');
+        assertEq(decimals, 9, 'Decimals should be updated');
+        assertEq(status, 1, 'Status should be 1');
+        assertEq(tokenRegistry.editCount(tokenAddress), 0, 'Edit count should be 0');
+    }
+
+    function testUpdateDelayToOptimisticApproval() public {
+        uint256 newDelay = 30 days;
+        vm.prank(owner);
+        tokentroller.updateDelayToOptimisticApproval(newDelay);
+
+        assertEq(tokentroller.delayToOptimisticApproval(), newDelay);
+    }
+
+    function testUpdateOwner() public {
+        address newOwner = address(5);
+        vm.prank(owner);
+        tokentroller.updateOwner(newOwner);
+
+        assertEq(tokentroller.owner(), newOwner);
     }
 
     function uintToStr(uint256 _i) internal pure returns (string memory) {
