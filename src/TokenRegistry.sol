@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 interface ITokentroller {
-    function canFastTrackToken(address _sender, address _contractAddress) external returns (bool);
-    function canRejectToken(address _sender, address _contractAddress) external returns (bool);
+    function canFastTrackToken(address _sender, address _contractAddress, uint256 _chainID) external returns (bool);
+    function canRejectToken(address _sender, address _contractAddress, uint256 _chainID) external returns (bool);
     function canUpdateTokentroller(address _newTokentroller) external returns (bool);
-    function canAddToken(address _newToken) external returns (bool);
-    function canUpdateToken(address _contractAddress) external returns (bool);
-    function canAcceptTokenEdit(address _contractAddress, uint256 _editIndex) external returns (bool);
+    function canAddToken(address _newToken, uint256 _chainID) external returns (bool);
+    function canUpdateToken(address _contractAddress, uint256 _chainID) external returns (bool);
+    function canAcceptTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) external returns (bool);
     function delayToOptimisticApproval() external view returns (uint256);
 }
 
@@ -30,7 +30,8 @@ contract TokenRegistry {
         string symbol; // Symbol of the token
         uint8 decimals; // Number of decimals for the token
         uint8 status; // Status indicating whether the token is pending approval [0], approved [1], rejected [2]
-        uint256 optimisticApprovalTime; // Timestamp of when the token was submitted
+        uint256 chainID; // Chain ID of the token
+        uint256 optimisticApprovalTime; // Timestamp when the token is optimistic approved
     }
 
     /**********************************************************************************************
@@ -40,13 +41,13 @@ contract TokenRegistry {
      * | |___ \ V /  __/ | | | |_\__ \
      * |_____| \_/ \___|_| |_|\__|___/
      *********************************************************************************************/
-    event TokenAdded(address indexed contractAddress, string name, string symbol, string logoURI, uint8 decimals); // Event for token addition
-    event UpdateSuggested(address indexed contractAddress, string name, string symbol, string logoURI, uint8 decimals); // Event for token update
-    event TokenApproved(address indexed contractAddress); // Event for token approval
-    event TokenRejected(address indexed contractAddress); // Event for token rejection
+    event TokenAdded(address indexed contractAddress, string name, string symbol, string logoURI, uint8 decimals, uint256 chainID); // Event for token addition
+    event UpdateSuggested(address indexed contractAddress, string name, string symbol, string logoURI, uint8 decimals, uint256 chainID); // Event for token update
+    event TokenApproved(address indexed contractAddress, uint256 chainID); // Event for token approval
+    event TokenRejected(address indexed contractAddress, uint256 chainID); // Event for token rejection
+    event TokenEditsCleared(address indexed contractAddress, uint256 chainID); // Event for token edits clearing
+    event TokenEditAccepted(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID); // Event for token edit acceptance
     event TokentrollerUpdated(address indexed newCouncil); // Event for tokentroller update
-    event TokenEditsCleared(address indexed contractAddress); // Event for token edits clearing
-    event TokenEditAccepted(address indexed contractAddress, uint256 indexed editIndex); // Event for token edit acceptance
 
     /**********************************************************************************************
      * __     __         _       _     _           
@@ -55,10 +56,10 @@ contract TokenRegistry {
      *   \ V / (_| | |  | | (_| | |_) | |  __/\__ \
      *    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___||___/
      *********************************************************************************************/
-    mapping(address => Token) public tokens; // Mapping to store tokens by their contract address
-    address[] public tokenAddresses; // Array to store all token addresses
-    mapping(address => mapping(uint256 => Token)) public editsOnTokens; // Mapping to store tokens by their contract address that are pending edits
-    mapping(address => uint256) public editCount; // Mapping to store the number of edits on a token
+    mapping(uint256 => mapping(address => Token)) public tokens; // Mapping to store tokens by their contract address for a specific chainID
+    mapping(uint256 => address[]) public tokenAddresses; // Array to store all token addresses for a specific chainID
+    mapping(uint256 => mapping(address => mapping(uint256 => Token))) public editsOnTokens; // Mapping to store tokens by their contract address that are pending edits for a specific chainID
+    mapping(uint256 => mapping(address => uint256)) public editCount; // Mapping to store the number of edits on a token for a specific chainID
     address public tokentroller; // Address of the governing council
 
 
@@ -97,10 +98,10 @@ contract TokenRegistry {
      * @notice Checks with the Tokentroller if the token can be added
      * @notice Sets an optimistic approval time based on the Tokentroller's delay setting
      *********************************************************************************************/
-    function addToken(address _contractAddress, string memory _name, string memory _symbol, string memory _logoURI, uint8 _decimals) public {
-        require(tokens[_contractAddress].contractAddress == address(0), "Token already exists");
+    function addToken(address _contractAddress, string memory _name, string memory _symbol, string memory _logoURI, uint8 _decimals, uint256 _chainID) public {
+        require(tokens[_chainID][_contractAddress].contractAddress == address(0), "Token already exists");
         require(_contractAddress != address(0), "New token address cannot be zero");
-        require(ITokentroller(tokentroller).canAddToken(_contractAddress), "Failed to add token");
+        require(ITokentroller(tokentroller).canAddToken(_contractAddress, _chainID), "Failed to add token");
 
         uint256 delayToOptimisticApproval = ITokentroller(tokentroller).delayToOptimisticApproval();
 
@@ -112,12 +113,13 @@ contract TokenRegistry {
             symbol: _symbol,
             decimals: _decimals,
             status: 0,
+            chainID: _chainID,
             optimisticApprovalTime: block.timestamp + delayToOptimisticApproval
         });
 
-        tokens[_contractAddress] = newToken;
-        tokenAddresses.push(_contractAddress);
-        emit TokenAdded(_contractAddress, _name, _symbol, _logoURI, _decimals);
+        tokens[_chainID][_contractAddress] = newToken;
+        tokenAddresses[_chainID].push(_contractAddress);
+        emit TokenAdded(_contractAddress, _name, _symbol, _logoURI, _decimals, _chainID);
     }
 
     /**********************************************************************************************
@@ -132,28 +134,28 @@ contract TokenRegistry {
      * @notice Otherwise, a new edit is suggested and stored for later approval.
      * @notice Emits a UpdateSuggested event upon successful update or edit suggestion.
      *********************************************************************************************/
-    function updateToken(address _contractAddress, string memory _name, string memory _symbol, string memory _logoURI, uint8 _decimals) public {
-        require(tokens[_contractAddress].contractAddress != address(0), "Token does not exist");
+    function updateToken(address _contractAddress, string memory _name, string memory _symbol, string memory _logoURI, uint8 _decimals, uint256 _chainID) public {
+        require(tokens[_chainID][_contractAddress].contractAddress != address(0), "Token does not exist");
         require(_contractAddress != address(0), "New token address cannot be zero");
-        require(ITokentroller(tokentroller).canUpdateToken(_contractAddress), "Failed to update token");
+        require(ITokentroller(tokentroller).canUpdateToken(_contractAddress, _chainID), "Failed to update token");
 
         uint256 delayToOptimisticApproval = ITokentroller(tokentroller).delayToOptimisticApproval();
 
         // If the token is in pending mode & the token is not optimistic approved and the submitter is the same as the original submitter
-        bool isOptimisticApproved = block.timestamp >= tokens[_contractAddress].optimisticApprovalTime;
+        bool isOptimisticApproved = block.timestamp >= tokens[_chainID][_contractAddress].optimisticApprovalTime;
         if (
-            tokens[_contractAddress].status == 0
+            tokens[_chainID][_contractAddress].status == 0
             && !isOptimisticApproved
-            && tokens[_contractAddress].submitter == msg.sender
+            && tokens[_chainID][_contractAddress].submitter == msg.sender
         ) {
-            tokens[_contractAddress].name = _name;
-            tokens[_contractAddress].symbol = _symbol;
-            tokens[_contractAddress].logoURI = _logoURI;
-            tokens[_contractAddress].decimals = _decimals;
-            tokens[_contractAddress].optimisticApprovalTime = block.timestamp + delayToOptimisticApproval; // Reset the optimistic approval time to now
+            tokens[_chainID][_contractAddress].name = _name;
+            tokens[_chainID][_contractAddress].symbol = _symbol;
+            tokens[_chainID][_contractAddress].logoURI = _logoURI;
+            tokens[_chainID][_contractAddress].decimals = _decimals;
+            tokens[_chainID][_contractAddress].optimisticApprovalTime = block.timestamp + delayToOptimisticApproval; // Reset the optimistic approval time to now
         } else {
-            uint256 newIndex = ++editCount[_contractAddress];
-            editsOnTokens[_contractAddress][newIndex] = Token({
+            uint256 newIndex = ++editCount[_chainID][_contractAddress];
+            editsOnTokens[_chainID][_contractAddress][newIndex] = Token({
                 contractAddress: _contractAddress,
                 submitter: msg.sender,
                 name: _name,
@@ -161,11 +163,12 @@ contract TokenRegistry {
                 symbol: _symbol,
                 decimals: _decimals,
                 status: 0,
+                chainID: _chainID,
                 optimisticApprovalTime: block.timestamp + delayToOptimisticApproval
             });
         }
 
-        emit UpdateSuggested(_contractAddress, _name, _symbol, _logoURI, _decimals);  
+        emit UpdateSuggested(_contractAddress, _name, _symbol, _logoURI, _decimals, _chainID);  
     }
 
     /**********************************************************************************************
@@ -179,36 +182,36 @@ contract TokenRegistry {
      * @notice Updates the edit count for the token
      * @notice Emits a TokenEditAccepted event upon successful acceptance
      *********************************************************************************************/
-    function acceptTokenEdit(address _contractAddress, uint256 _editIndex) public {
-        require(tokens[_contractAddress].contractAddress != address(0), "Token does not exist");
-        require(_editIndex <= editCount[_contractAddress], "Invalid edit index");
-        require(ITokentroller(tokentroller).canAcceptTokenEdit(_contractAddress, _editIndex), "Failed to accept token edit");
+    function acceptTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) public {
+        require(tokens[_chainID][_contractAddress].contractAddress != address(0), "Token does not exist");
+        require(_editIndex <= editCount[_chainID][_contractAddress], "Invalid edit index");
+        require(ITokentroller(tokentroller).canAcceptTokenEdit(_contractAddress, _chainID, _editIndex), "Failed to accept token edit");
 
-        Token memory edit = editsOnTokens[_contractAddress][_editIndex];
+        Token memory edit = editsOnTokens[_chainID][_contractAddress][_editIndex];
         if (edit.status == 1 || (edit.status == 0 && block.timestamp >= edit.optimisticApprovalTime)) {
-            tokens[_contractAddress] = edit; // Update the original token with the latest approved edit
-            tokens[_contractAddress].status = 1; // Set status to approved
+            tokens[_chainID][_contractAddress] = edit; // Update the original token with the latest approved edit
+            tokens[_chainID][_contractAddress].status = 1; // Set status to approved
         } else {
             revert("Edit is not approved or past the optimistic approval time");
         }
 
         // Remove all edits before this one
         for (uint256 i = 1; i < _editIndex; i++) {
-            delete editsOnTokens[_contractAddress][i];
+            delete editsOnTokens[_chainID][_contractAddress][i];
         }
 
         // Shift remaining edits
         uint256 newEditCount = 0;
-        for (uint256 i = _editIndex + 1; i <= editCount[_contractAddress]; i++) {
+        for (uint256 i = _editIndex + 1; i <= editCount[_chainID][_contractAddress]; i++) {
             newEditCount++;
-            editsOnTokens[_contractAddress][newEditCount] = editsOnTokens[_contractAddress][i];
-            delete editsOnTokens[_contractAddress][i];
+            editsOnTokens[_chainID][_contractAddress][newEditCount] = editsOnTokens[_chainID][_contractAddress][i];
+            delete editsOnTokens[_chainID][_contractAddress][i];
         }
 
         // Update edit count
-        editCount[_contractAddress] = newEditCount;
+        editCount[_chainID][_contractAddress] = newEditCount;
 
-        emit TokenEditAccepted(_contractAddress, _editIndex);
+        emit TokenEditAccepted(_contractAddress, _editIndex, _chainID);
     }
 
 
@@ -234,18 +237,18 @@ contract TokenRegistry {
      *         2. Approved (status == 1)
      *         3. Rejected (status == 2)
      *********************************************************************************************/
-    function listAllTokens(uint256 initialIndex, uint256 size) public view returns (Token[] memory, uint256) {
-        require(size > 0, "Size must be greater than zero");
-        require(initialIndex < tokenAddresses.length, "Initial index out of range");
+    function listAllTokens(uint256 _chainID, uint256 _initialIndex, uint256 _size) public view returns (Token[] memory, uint256) {
+        require(_size > 0, "Size must be greater than zero");
+        require(_initialIndex < tokenAddresses[_chainID].length, "Initial index out of range");
 
-        uint256 remainingTokens = tokenAddresses.length - initialIndex;
-        uint256 actualSize = size < remainingTokens ? size : remainingTokens;
+        uint256 remainingTokens = tokenAddresses[_chainID].length - _initialIndex;
+        uint256 actualSize = _size < remainingTokens ? _size : remainingTokens;
 
         Token[] memory pageTokens = new Token[](actualSize);
-        uint256 finalIndex = initialIndex + actualSize - 1;
+        uint256 finalIndex = _initialIndex + actualSize - 1;
 
         for (uint256 i = 0; i < actualSize; i++) {
-            pageTokens[i] = tokens[tokenAddresses[initialIndex + i]];
+            pageTokens[i] = tokens[_chainID][tokenAddresses[_chainID][_initialIndex + i]];
         }
 
         return (pageTokens, finalIndex);
@@ -262,17 +265,17 @@ contract TokenRegistry {
      *         2. Approved (status == 1)
      * @notice Tokens that are rejected or in the optimistic approval period are not included.
 	 *********************************************************************************************/
-    function listApprovedTokens(uint256 initialIndex, uint256 size) public view returns (Token[] memory, uint256) {
-        require(size > 0, "Size must be greater than zero");
-        require(initialIndex < tokenAddresses.length, "Initial index out of range");
+    function listApprovedTokens(uint256 _chainID, uint256 _initialIndex, uint256 _size) public view returns (Token[] memory, uint256) {
+        require(_size > 0, "Size must be greater than zero");
+        require(_initialIndex < tokenAddresses[_chainID].length, "Initial index out of range");
 
-        Token[] memory pageTokens = new Token[](size);
+        Token[] memory pageTokens = new Token[](_size);
         uint256 count = 0;
-        uint256 finalIndex = initialIndex;
+        uint256 finalIndex = _initialIndex;
 
         // Loop through the token addresses and add the tokens to the pageTokens array
-        for (uint256 i = initialIndex; i < tokenAddresses.length && count < size; i++) {
-            Token memory token = tokens[tokenAddresses[i]];
+        for (uint256 i = _initialIndex; i < tokenAddresses[_chainID].length && count < _size; i++) {
+            Token memory token = tokens[_chainID][tokenAddresses[_chainID][i]];
             if (token.contractAddress != address(0) && (token.status == 1 || (token.status == 0 && block.timestamp >= token.optimisticApprovalTime))) {
                 pageTokens[count] = token;
                 count++;
@@ -281,7 +284,7 @@ contract TokenRegistry {
         }
 
         // If we didn't fill the entire array, create a new one with the correct size
-        if (count < size) {
+        if (count < _size) {
             Token[] memory resizedTokens = new Token[](count);
             for (uint256 i = 0; i < count; i++) {
                 resizedTokens[i] = pageTokens[i];
@@ -301,16 +304,16 @@ contract TokenRegistry {
      * @notice This function returns only tokens with status == 2 (rejected).
      * @notice If there are fewer rejected tokens than the requested size, it returns all available.
      *********************************************************************************************/
-    function listRejectedTokens(uint256 initialIndex, uint256 size) public view returns (Token[] memory, uint256) {
-        require(size > 0, "Size must be greater than zero");
-        require(initialIndex < tokenAddresses.length, "Initial index out of range");
+    function listRejectedTokens(uint256 _chainID, uint256 _initialIndex, uint256 _size) public view returns (Token[] memory, uint256) {
+        require(_size > 0, "Size must be greater than zero");
+        require(_initialIndex < tokenAddresses[_chainID].length, "Initial index out of range");
 
-        Token[] memory pageTokens = new Token[](size);
+        Token[] memory pageTokens = new Token[](_size);
         uint256 count = 0;
-        uint256 finalIndex = initialIndex;
+        uint256 finalIndex = _initialIndex;
 
-        for (uint256 i = initialIndex; i < tokenAddresses.length && count < size; i++) {
-            Token memory token = tokens[tokenAddresses[i]];
+        for (uint256 i = _initialIndex; i < tokenAddresses[_chainID].length && count < _size; i++) {
+            Token memory token = tokens[_chainID][tokenAddresses[_chainID][i]];
             if (token.status == 2) {
                 pageTokens[count] = token;
                 count++;
@@ -319,7 +322,7 @@ contract TokenRegistry {
         }
 
         // If we didn't fill the entire array, create a new one with the correct size
-        if (count < size) {
+        if (count < _size) {
             Token[] memory resizedTokens = new Token[](count);
             for (uint256 i = 0; i < count; i++) {
                 resizedTokens[i] = pageTokens[i];
@@ -339,16 +342,16 @@ contract TokenRegistry {
      * @notice This function returns only tokens with status == 0 (pending).
      * @notice If there are fewer pending tokens than the requested size, it returns all available.
      *********************************************************************************************/
-    function listPendingTokens(uint256 initialIndex, uint256 size) public view returns (Token[] memory, uint256) {
-        require(size > 0, "Size must be greater than zero");
-        require(initialIndex < tokenAddresses.length, "Initial index out of range");
+    function listPendingTokens(uint256 _chainID, uint256 _initialIndex, uint256 _size) public view returns (Token[] memory, uint256) {
+        require(_size > 0, "Size must be greater than zero");
+        require(_initialIndex < tokenAddresses[_chainID].length, "Initial index out of range");
 
-        Token[] memory pageTokens = new Token[](size);
+        Token[] memory pageTokens = new Token[](_size);
         uint256 count = 0;
-        uint256 finalIndex = initialIndex;
+        uint256 finalIndex = _initialIndex;
 
-        for (uint256 i = initialIndex; i < tokenAddresses.length && count < size; i++) {
-            Token memory token = tokens[tokenAddresses[i]];
+        for (uint256 i = _initialIndex; i < tokenAddresses[_chainID].length && count < _size; i++) {
+            Token memory token = tokens[_chainID][tokenAddresses[_chainID][i]];
             if (token.status == 0) {
                 pageTokens[count] = token;
                 count++;
@@ -357,7 +360,7 @@ contract TokenRegistry {
         }
 
         // If we didn't fill the entire array, create a new one with the correct size
-        if (count < size) {
+        if (count < _size) {
             Token[] memory resizedTokens = new Token[](count);
             for (uint256 i = 0; i < count; i++) {
                 resizedTokens[i] = pageTokens[i];
@@ -375,8 +378,8 @@ contract TokenRegistry {
      *         registry, regardless of their current status (pending, approved, or rejected).
      *         It provides a quick way to get the size of the token list without pagination.
      *********************************************************************************************/
-    function tokenCount() public view returns (uint256) {
-        return tokenAddresses.length;
+    function tokenCount(uint256 _chainID) public view returns (uint256) {
+        return tokenAddresses[_chainID].length;
     }
 
 
@@ -400,15 +403,15 @@ contract TokenRegistry {
      * @notice The token must exist in the registry
      * @notice Emits a TokenApproved event upon successful fast-tracking
      *********************************************************************************************/
-    function fastTrackToken(address _contractAddress) public {
-        require(tokens[_contractAddress].contractAddress != address(0), "Token does not exist");
-        require(tokens[_contractAddress].status == 0, "Token is already approved or rejected");
-        require(ITokentroller(tokentroller).canFastTrackToken(msg.sender, _contractAddress), "Failed to fast-track token");
+    function fastTrackToken(uint256 _chainID, address _contractAddress) public {
+        require(tokens[_chainID][_contractAddress].contractAddress != address(0), "Token does not exist");
+        require(tokens[_chainID][_contractAddress].status == 0, "Token is already approved or rejected");
+        require(ITokentroller(tokentroller).canFastTrackToken(msg.sender, _contractAddress, _chainID), "Failed to fast-track token");
 
         // Proceed to approve the token
-        tokens[_contractAddress].status = 1;
+        tokens[_chainID][_contractAddress].status = 1;
 
-        emit TokenApproved(_contractAddress);
+        emit TokenApproved(_contractAddress, _chainID);
     }
 
     /**********************************************************************************************
@@ -418,15 +421,14 @@ contract TokenRegistry {
      * @notice The token must exist in the registry
      * @notice Emits a TokenRejected event upon successful rejection
      *********************************************************************************************/
-    function rejectToken(address _contractAddress) public {
-        require(tokens[_contractAddress].contractAddress != address(0), "Token does not exist");
-        require(tokens[_contractAddress].status == 0, "Token is already approved or rejected");
-        require(ITokentroller(tokentroller).canRejectToken(msg.sender, _contractAddress), "Failed to reject token");
+    function rejectToken(uint256 _chainID, address _contractAddress) public {
+        require(tokens[_chainID][_contractAddress].contractAddress != address(0), "Token does not exist");
+        require(ITokentroller(tokentroller).canRejectToken(msg.sender, _contractAddress, _chainID), "Failed to reject token");
 
         // Proceed to reject the token
-        tokens[_contractAddress].status = 2;
+        tokens[_chainID][_contractAddress].status = 2;
 
-        emit TokenRejected(_contractAddress);
+        emit TokenRejected(_contractAddress, _chainID);
     }
 
     /**********************************************************************************************

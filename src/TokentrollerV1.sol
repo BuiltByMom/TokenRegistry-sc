@@ -5,15 +5,17 @@ import "./TokenRegistry.sol";
 
 interface ITokenRegistry {
     struct Token {
+        address contractAddress; // Address of the token
+        address submitter; // Address of the submitter
         string name; // Name of the token
-        string description; // Description of the token
-        string tokenLogoURL; // URL of the token's logo
+        string logoURI; // URI of the token's logo
         string symbol; // Symbol of the token
         uint8 decimals; // Number of decimals for the token
         uint8 status; // Status indicating whether the token is pending approval [0], approved [1], rejected [2]
-        uint256 submissionTime; // Timestamp of when the token was submitted
+        uint256 chainID; // Chain ID of the token
+        uint256 optimisticApprovalTime; // Timestamp when the token is optimistic approved
     }
-    function getToken(address _contractAddress) external view returns (Token memory);
+    function getToken(uint256 _chainID, address _contractAddress) external view returns (Token memory);
     function updateTokentroller(address _newTokentroller) external;
 }
 
@@ -112,7 +114,7 @@ contract TokentrollerV1 {
 	 * @notice It should implement any necessary checks before allowing fast-tracking
 	 * @return bool Returns true if the token can be fast-tracked, false otherwise
 	 *********************************************************************************************/
-    function canFastTrackToken(address _sender, address _contractAddress) public view returns (bool) {
+    function canFastTrackToken(address _sender, address _contractAddress, uint256 _chainID) public view returns (bool) {
         require(_sender == owner, "Only the owner can call this function");
         return true;
     }
@@ -124,7 +126,7 @@ contract TokentrollerV1 {
 	 * @notice It should implement any necessary checks before allowing rejection
 	 * @return bool Returns true if the token can be rejected, false otherwise
 	 *********************************************************************************************/
-    function canRejectToken(address _sender, address _contractAddress) public view returns (bool) {
+    function canRejectToken(address _sender, address _contractAddress, uint256 _chainID) public view returns (bool) {
         require(_sender == owner, "Only the owner can call this function");
         return true;
     }
@@ -136,7 +138,7 @@ contract TokentrollerV1 {
 	 * @notice It should implement any necessary checks before allowing token addition
 	 * @return bool Returns true if the token can be added, false otherwise
 	 *********************************************************************************************/
-    function canAddToken(address _contractAddress) public view returns (bool) {
+    function canAddToken(address _contractAddress, uint256 _chainID) public view returns (bool) {
         return true;
     }
 
@@ -147,7 +149,7 @@ contract TokentrollerV1 {
 	 * @notice It should implement any necessary checks before allowing token updates
 	 * @return bool Returns true if the token can be updated, false otherwise
 	 *********************************************************************************************/
-    function canUpdateToken(address _contractAddress) public view returns (bool) {
+    function canUpdateToken(address _contractAddress, uint256 _chainID) public view returns (bool) {
         return true;
     }
 
@@ -159,7 +161,7 @@ contract TokentrollerV1 {
 	 * @notice It should implement any necessary checks before allowing edit acceptance
 	 * @return bool Returns true if the edit can be accepted, false otherwise
 	 *********************************************************************************************/
-    function canAcceptTokenEdit(address _contractAddress, uint256 _editIndex) public view returns (bool) {
+    function canAcceptTokenEdit(address _contractAddress, uint256 _chainID, uint256 _editIndex) public view returns (bool) {
         return true;
     }
 }
