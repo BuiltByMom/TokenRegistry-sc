@@ -7,8 +7,9 @@ interface ITokentroller {
     function canUpdateTokentroller(address _newTokentroller) external returns (bool);
     function canAddToken(address _newToken, uint256 _chainID) external returns (bool);
     function canUpdateToken(address _contractAddress, uint256 _chainID) external returns (bool);
-    function canAcceptTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) external returns (bool);
-    function delayToOptimisticApproval() external view returns (uint256);
+    function canAcceptTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID)
+        external
+        returns (bool);
 }
 
 contract TokenRegistry {
@@ -19,8 +20,6 @@ contract TokenRegistry {
      * - 0: Pending approval
      * - 1: Approved
      * - 2: Rejected
-     * The optimisticApprovalTime is the timestamp when the token becomes eligible for
-     * optimistic approval (submission time + delayToOptimisticApproval)
      *********************************************************************************************/
     struct Token {
         address contractAddress; // Address of the token
@@ -31,7 +30,6 @@ contract TokenRegistry {
         uint8 decimals; // Number of decimals for the token
         uint8 status; // Status indicating whether the token is pending approval [0], approved [1], rejected [2]
         uint256 chainID; // Chain ID of the token
-        uint256 optimisticApprovalTime; // Timestamp when the token is optimistic approved
     }
 
     /**********************************************************************************************
@@ -96,14 +94,11 @@ contract TokenRegistry {
      * @notice Emits a TokenAdded event upon successful addition
      * @notice Requires the token to not already exist and have a valid address
      * @notice Checks with the Tokentroller if the token can be added
-     * @notice Sets an optimistic approval time based on the Tokentroller's delay setting
      *********************************************************************************************/
     function addToken(address _contractAddress, string memory _name, string memory _symbol, string memory _logoURI, uint8 _decimals, uint256 _chainID) public {
         require(tokens[_chainID][_contractAddress].contractAddress == address(0), "Token already exists");
         require(_contractAddress != address(0), "New token address cannot be zero");
         require(ITokentroller(tokentroller).canAddToken(_contractAddress, _chainID), "Failed to add token");
-
-        uint256 delayToOptimisticApproval = ITokentroller(tokentroller).delayToOptimisticApproval();
 
         Token memory newToken = Token({
             contractAddress: _contractAddress,
@@ -113,8 +108,7 @@ contract TokenRegistry {
             symbol: _symbol,
             decimals: _decimals,
             status: 0,
-            chainID: _chainID,
-            optimisticApprovalTime: block.timestamp + delayToOptimisticApproval
+            chainID: _chainID
         });
 
         tokens[_chainID][_contractAddress] = newToken;
@@ -139,20 +133,14 @@ contract TokenRegistry {
         require(_contractAddress != address(0), "New token address cannot be zero");
         require(ITokentroller(tokentroller).canUpdateToken(_contractAddress, _chainID), "Failed to update token");
 
-        uint256 delayToOptimisticApproval = ITokentroller(tokentroller).delayToOptimisticApproval();
-
-        // If the token is in pending mode & the token is not optimistic approved and the submitter is the same as the original submitter
-        bool isOptimisticApproved = block.timestamp >= tokens[_chainID][_contractAddress].optimisticApprovalTime;
+        // If the token is in pending mode and the submitter is the same as the original submitter
         if (
-            tokens[_chainID][_contractAddress].status == 0
-            && !isOptimisticApproved
-            && tokens[_chainID][_contractAddress].submitter == msg.sender
+            tokens[_chainID][_contractAddress].status == 0 && tokens[_chainID][_contractAddress].submitter == msg.sender
         ) {
             tokens[_chainID][_contractAddress].name = _name;
             tokens[_chainID][_contractAddress].symbol = _symbol;
             tokens[_chainID][_contractAddress].logoURI = _logoURI;
             tokens[_chainID][_contractAddress].decimals = _decimals;
-            tokens[_chainID][_contractAddress].optimisticApprovalTime = block.timestamp + delayToOptimisticApproval; // Reset the optimistic approval time to now
         } else {
             uint256 newIndex = ++editCount[_chainID][_contractAddress];
             editsOnTokens[_chainID][_contractAddress][newIndex] = Token({
@@ -163,12 +151,11 @@ contract TokenRegistry {
                 symbol: _symbol,
                 decimals: _decimals,
                 status: 0,
-                chainID: _chainID,
-                optimisticApprovalTime: block.timestamp + delayToOptimisticApproval
+                chainID: _chainID
             });
         }
 
-        emit UpdateSuggested(_contractAddress, _name, _symbol, _logoURI, _decimals, _chainID);  
+        emit UpdateSuggested(_contractAddress, _name, _symbol, _logoURI, _decimals, _chainID);
     }
 
     /**********************************************************************************************
@@ -185,14 +172,17 @@ contract TokenRegistry {
     function acceptTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) public {
         require(tokens[_chainID][_contractAddress].contractAddress != address(0), "Token does not exist");
         require(_editIndex <= editCount[_chainID][_contractAddress], "Invalid edit index");
-        require(ITokentroller(tokentroller).canAcceptTokenEdit(_contractAddress, _chainID, _editIndex), "Failed to accept token edit");
+        require(
+            ITokentroller(tokentroller).canAcceptTokenEdit(_contractAddress, _chainID, _editIndex),
+            "Failed to accept token edit"
+        );
 
         Token memory edit = editsOnTokens[_chainID][_contractAddress][_editIndex];
-        if (edit.status == 1 || (edit.status == 0 && block.timestamp >= edit.optimisticApprovalTime)) {
+        if (edit.status == 1) {
             tokens[_chainID][_contractAddress] = edit; // Update the original token with the latest approved edit
             tokens[_chainID][_contractAddress].status = 1; // Set status to approved
         } else {
-            revert("Edit is not approved or past the optimistic approval time");
+            revert("Edit is not approved");
         }
 
         // Remove all edits before this one
@@ -228,8 +218,9 @@ contract TokenRegistry {
 
     /**********************************************************************************************
      * @dev Lists all tokens in the registry with pagination, regardless of approval status.
-     * @param initialIndex The starting index for token retrieval.
-     * @param size The number of tokens to retrieve.
+     * @param _chainID The chain ID to retrieve tokens from.
+     * @param _initialIndex The starting index for token retrieval.
+     * @param _size The number of tokens to retrieve.
      * @return Token[] - An array of Token structs for the specified range.
      * @return uint256 - The index of the last token retrieved.
      * @notice This function returns all tokens, including those that are:
@@ -256,16 +247,19 @@ contract TokenRegistry {
 
 	/**********************************************************************************************
      * @dev Lists approved tokens in the registry with pagination.
-     * @param initialIndex The starting index for token retrieval.
-     * @param size The number of tokens to retrieve.
+     * @param _chainID The chain ID to retrieve tokens from.
+     * @param _initialIndex The starting index for token retrieval.
+     * @param _size The number of tokens to retrieve.
      * @return Token[]  - An array of Token structs for the specified range.
      * @return uint256 - The index of the last token retrieved.
-     * @notice This function returns tokens that are either:
-     *         1. Pending but past the optimistic approval period (status == 0)
-     *         2. Approved (status == 1)
-     * @notice Tokens that are rejected or in the optimistic approval period are not included.
-	 *********************************************************************************************/
-    function listApprovedTokens(uint256 _chainID, uint256 _initialIndex, uint256 _size) public view returns (Token[] memory, uint256) {
+     * @notice This function returns tokens that are Approved (status == 1)
+     * @notice Tokens that are rejected are not included.
+     *********************************************************************************************/
+    function listApprovedTokens(uint256 _chainID, uint256 _initialIndex, uint256 _size)
+        public
+        view
+        returns (Token[] memory, uint256)
+    {
         require(_size > 0, "Size must be greater than zero");
         require(_initialIndex < tokenAddresses[_chainID].length, "Initial index out of range");
 
@@ -276,7 +270,7 @@ contract TokenRegistry {
         // Loop through the token addresses and add the tokens to the pageTokens array
         for (uint256 i = _initialIndex; i < tokenAddresses[_chainID].length && count < _size; i++) {
             Token memory token = tokens[_chainID][tokenAddresses[_chainID][i]];
-            if (token.contractAddress != address(0) && (token.status == 1 || (token.status == 0 && block.timestamp >= token.optimisticApprovalTime))) {
+            if (token.contractAddress != address(0) && token.status == 1) {
                 pageTokens[count] = token;
                 count++;
                 finalIndex = i;
@@ -297,8 +291,9 @@ contract TokenRegistry {
 
     /**********************************************************************************************
      * @dev Lists all rejected tokens in the registry with pagination.
-     * @param initialIndex The starting index for token retrieval.
-     * @param size The number of tokens to retrieve.
+     * @param _chainID The chain ID to retrieve tokens from.
+     * @param _initialIndex The starting index for token retrieval.
+     * @param _size The number of tokens to retrieve.
      * @return Token[] - An array of rejected Token structs for the specified range.
      * @return uint256 - The index of the last token retrieved.
      * @notice This function returns only tokens with status == 2 (rejected).
@@ -335,8 +330,9 @@ contract TokenRegistry {
 
     /**********************************************************************************************
      * @dev Lists all pending tokens in the registry with pagination.
-     * @param initialIndex The starting index for token retrieval.
-     * @param size The number of tokens to retrieve.
+     * @param _chainID The chain ID to retrieve tokens from.
+     * @param _initialIndex The starting index for token retrieval.
+     * @param _size The number of tokens to retrieve.
      * @return Token[] - An array of pending Token structs for the specified range.
      * @return uint256 - The index of the last token retrieved.
      * @notice This function returns only tokens with status == 0 (pending).

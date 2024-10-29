@@ -13,7 +13,6 @@ interface ITokenRegistry {
         uint8 decimals; // Number of decimals for the token
         uint8 status; // Status indicating whether the token is pending approval [0], approved [1], rejected [2]
         uint256 chainID; // Chain ID of the token
-        uint256 optimisticApprovalTime; // Timestamp when the token is optimistic approved
     }
     function getToken(uint256 _chainID, address _contractAddress) external view returns (Token memory);
     function updateTokentroller(address _newTokentroller) external;
@@ -22,9 +21,7 @@ interface ITokenRegistry {
 contract TokentrollerV1 {
     address public tokenRegistry;
     address public owner;
-    uint256 public delayToOptimisticApproval = 14 days; // Delay to optimistic approval
 
-    event DelayUpdated(uint256 oldDelay, uint256 newDelay);
 	event OwnerUpdated(address indexed oldOwner, address indexed newOwner);
 
 
@@ -46,22 +43,8 @@ contract TokentrollerV1 {
      * |_|  |_|\__,_|\__\__,_|\__\___/|_|  |___/
      *
      * @dev These functions are designed to alter the state of the Tokentroller contract, including
-     * the delay to optimistic approval and the tokentroller address in the TokenRegistry contract.
+     * the tokentroller address in the TokenRegistry contract.
      *********************************************************************************************/
-
-    /**********************************************************************************************
-     * @dev Updates the delay period for optimistic approval of tokens
-     * @param _newDelay The new delay period in seconds
-     * @notice This function can only be called by the owner
-     * @notice The new delay must be different from the current delay
-     * @notice Emits a DelayUpdated event upon successful update
-     *********************************************************************************************/
-    function updateDelayToOptimisticApproval(uint256 _newDelay) public {
-        require(msg.sender == owner, "Only the owner can call this function");
-        require(_newDelay != delayToOptimisticApproval, "New delay must be different from current delay");
-        delayToOptimisticApproval = _newDelay;
-        emit DelayUpdated(delayToOptimisticApproval, _newDelay);
-    }
 
     /**********************************************************************************************
      * @dev Updates the tokentroller address in the TokenRegistry contract
