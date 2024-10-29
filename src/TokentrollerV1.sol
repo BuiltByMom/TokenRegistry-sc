@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./TokenRegistry.sol";
+import "./TokenMetadataRegistry.sol";
 
 interface ITokenRegistry {
     struct Token {
@@ -20,6 +21,7 @@ interface ITokenRegistry {
 
 contract TokentrollerV1 {
     address public tokenRegistry;
+    address public metadataRegistry;
     address public owner;
 
 	event OwnerUpdated(address indexed oldOwner, address indexed newOwner);
@@ -32,6 +34,7 @@ contract TokentrollerV1 {
     constructor(address _owner) {
         owner = _owner;
         tokenRegistry = address(new TokenRegistry(address(this)));
+        metadataRegistry = address(new TokenMetadataRegistry(address(this)));
     }
 
 
@@ -146,5 +149,31 @@ contract TokentrollerV1 {
 	 *********************************************************************************************/
     function canAcceptTokenEdit(address _contractAddress, uint256 _chainID, uint256 _editIndex) public view returns (bool) {
         return true;
+    }
+
+    /**********************************************************************************************
+     * @dev Adds a new metadata field to the registry for a specific chain
+     * @param chainId The ID of the chain to add the field to
+     * @param name The name of the metadata field
+     * @param isRequired Whether the field is required for tokens
+     * @notice This function can only be called by the owner
+     * @notice Calls the addMetadataField function in the TokenMetadataRegistry contract
+     *********************************************************************************************/
+    function addMetadataField(uint256 chainId, string calldata name, bool isRequired) external {
+        require(msg.sender == owner, "Only owner can call");
+        TokenMetadataRegistry(metadataRegistry).addMetadataField(chainId, name, isRequired);
+}
+
+    /**********************************************************************************************
+     * @dev Updates the active status of an existing metadata field
+     * @param chainId The ID of the chain containing the field
+     * @param name The name of the metadata field to update
+     * @param isActive The new active status for the field
+     * @notice This function can only be called by the owner
+     * @notice Calls the updateMetadataField function in the TokenMetadataRegistry contract
+     *********************************************************************************************/
+    function updateMetadataField(uint256 chainId, string calldata name, bool isActive)external {
+        require(msg.sender == owner, "Only owner can call");
+        TokenMetadataRegistry(metadataRegistry).updateMetadataField(chainId, name, isActive);
     }
 }
