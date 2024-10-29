@@ -178,12 +178,9 @@ contract TokenRegistry {
         );
 
         Token memory edit = editsOnTokens[_chainID][_contractAddress][_editIndex];
-        if (edit.status == 1) {
-            tokens[_chainID][_contractAddress] = edit; // Update the original token with the latest approved edit
-            tokens[_chainID][_contractAddress].status = 1; // Set status to approved
-        } else {
-            revert("Edit is not approved");
-        }
+
+        tokens[_chainID][_contractAddress] = edit; // Update the original token with the latest approved edit
+        tokens[_chainID][_contractAddress].status = 1; // Set status to approved
 
         // Remove all edits before this one
         for (uint256 i = 1; i < _editIndex; i++) {

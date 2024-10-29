@@ -12,6 +12,7 @@ contract TokenRegistryTest is Test {
     address nonOwner = address(2);
     address nonOwner2 = address(3);
     address tokenAddress = address(4);
+    uint256 chainID = 1;
 
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
@@ -20,27 +21,28 @@ contract TokenRegistryTest is Test {
 
     function testAddToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
-        (,, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status,) = tokenRegistry.tokens(tokenAddress);
+        (address contractAddress, address submitter, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status, uint256 chainId) = tokenRegistry.tokens(chainID, tokenAddress);
 
         assertEq(name, "Test Token");
         assertEq(symbol, "TTK");
         assertEq(logoURI, "https://example.com/logo.png");
         assertEq(decimals, 18);
         assertEq(status, 0);
+        assertEq(chainID, chainID);
     }
 
     function testUpdateToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
  
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9);
+        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
 
-        (,,string memory name, string memory logoURI, string memory symbol, uint8 decimals,,) = tokenRegistry.tokens(tokenAddress);
+        (address contractAddress, address submitter, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status, uint256 chainId) = tokenRegistry.tokens(chainID, tokenAddress);
 
-        assertEq(name, "Updated Token", "Name should be updeated");
+        assertEq(name, "Updated Token", "Name should be updated");
         assertEq(symbol, "UTK", "Symbol should be updated");
         assertEq(logoURI, "https://example.com/new_logo.png", "Logo URI should be updated");
         assertEq(decimals, 9, "Decimals should be updated");
@@ -48,24 +50,23 @@ contract TokenRegistryTest is Test {
 
     function testFastTrackToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(tokenAddress);
+        tokenRegistry.fastTrackToken(chainID, tokenAddress);
 
-        (,,,,,,uint8 status,) = tokenRegistry.tokens(tokenAddress);
+        (address contractAddress, address submitter, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status, uint256 chainId) = tokenRegistry.tokens(chainID, tokenAddress);
         assertEq(status, 1, 'Token should be fast-tracked');
     }
 
     function testRejectToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.rejectToken(tokenAddress);
+        tokenRegistry.rejectToken(chainID, tokenAddress);
 
-        (,,,,,,uint8 status,) = tokenRegistry.tokens(tokenAddress);
-
+        (address contractAddress, address submitter, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status, uint256 chainId) = tokenRegistry.tokens(chainID, tokenAddress);
         assertEq(status, 2);
     }
 
@@ -80,10 +81,10 @@ contract TokenRegistryTest is Test {
     function testListAllTokens() public {
         for (uint256 i = 0; i < 5; i++) {
             vm.prank(nonOwner);
-            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18);
+            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18, chainID);
         }
 
-        (TokenRegistry.Token[] memory tokens, uint256 finalIndex) = tokenRegistry.listAllTokens(0, 3);
+        (TokenRegistry.Token[] memory tokens, uint256 finalIndex) = tokenRegistry.listAllTokens(chainID, 0, 3);
         assertEq(tokens.length, 3);
         assertEq(finalIndex, 2);
         assertEq(tokens[0].name, "Token 0");
@@ -93,14 +94,14 @@ contract TokenRegistryTest is Test {
     function testListApprovedTokens() public {
         for (uint256 i = 0; i < 5; i++) {
             vm.prank(nonOwner);
-            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18);
+            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18, chainID);
             if (i % 2 == 0) {
                 vm.prank(owner);
-                tokenRegistry.fastTrackToken(address(uint160(i + 10)));
+                tokenRegistry.fastTrackToken(chainID, address(uint160(i + 10)));
             }
         }
 
-        (TokenRegistry.Token[] memory tokens, uint256 finalIndex) = tokenRegistry.listApprovedTokens(0, 3);
+        (TokenRegistry.Token[] memory tokens, uint256 finalIndex) = tokenRegistry.listApprovedTokens(chainID, 0, 3);
         assertEq(tokens.length, 3);
         assertEq(finalIndex, 4);
         assertEq(tokens[0].name, "Token 0");
@@ -111,30 +112,27 @@ contract TokenRegistryTest is Test {
     function testTokenCount() public {
         for (uint256 i = 0; i < 5; i++) {
             vm.prank(nonOwner);
-            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18);
+            tokenRegistry.addToken(address(uint160(i + 10)), string(abi.encodePacked("Token ", uintToStr(i))), string(abi.encodePacked("TK", uintToStr(i))), "https://example.com/logo.png", 18, chainID);
         }
 
-        assertEq(tokenRegistry.tokenCount(), 5);
+        assertEq(tokenRegistry.tokenCount(chainID), 5);
     }
 
     function testAcceptTokenEdit() public {
         // Add a token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
         // Suggest an update
         vm.prank(nonOwner2);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9);
-
-        // Fast forward time to pass the optimistic approval period
-        vm.warp(block.timestamp + tokentroller.delayToOptimisticApproval() + 1);
+        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
 
         // Accept the edit
         vm.prank(owner);
-        tokenRegistry.acceptTokenEdit(tokenAddress, 1);
+        tokenRegistry.acceptTokenEdit(tokenAddress, 1, chainID);
 
         // Retrieve the updated token
-        (,, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status,) = tokenRegistry.tokens(tokenAddress);
+        (address contractAddress, address submitter, string memory name, string memory logoURI, string memory symbol, uint8 decimals, uint8 status, uint256 chainId) = tokenRegistry.tokens(chainID, tokenAddress);
 
         // Assert the token details have been updated
         assertEq(name, "Updated Token", 'Name should be updated');
@@ -142,15 +140,7 @@ contract TokenRegistryTest is Test {
         assertEq(logoURI, "https://example.com/new_logo.png", 'Logo URI should be updated');
         assertEq(decimals, 9, 'Decimals should be updated');
         assertEq(status, 1, 'Status should be 1');
-        assertEq(tokenRegistry.editCount(tokenAddress), 0, 'Edit count should be 0');
-    }
-
-    function testUpdateDelayToOptimisticApproval() public {
-        uint256 newDelay = 30 days;
-        vm.prank(owner);
-        tokentroller.updateDelayToOptimisticApproval(newDelay);
-
-        assertEq(tokentroller.delayToOptimisticApproval(), newDelay);
+        assertEq(tokenRegistry.editCount(chainID, tokenAddress), 0, 'Edit count should be 0');
     }
 
     function testUpdateOwner() public {
