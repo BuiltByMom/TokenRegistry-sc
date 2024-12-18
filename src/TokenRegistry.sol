@@ -4,51 +4,12 @@ pragma solidity ^0.8.0;
 import "./interfaces/ITokentroller.sol";
 import "./interfaces/ITokenMetadataRegistry.sol";
 import "./interfaces/ISharedTypes.sol";
+import "./interfaces/ITokenRegistry.sol";
 
-contract TokenRegistry {
+contract TokenRegistry is ITokenRegistry {
     /**********************************************************************************************
-     * Token struct represents the essential information for a token in the registry.
-     * It includes details such as contract address, submitter, name, logo URI, symbol, and decimals.
-     *********************************************************************************************/
-    struct Token {
-        address contractAddress; // Address of the token
-        address submitter; // Address of the submitter
-        string name; // Name of the token
-        string logoURI; // URI of the token's logo
-        string symbol; // Symbol of the token
-        uint8 decimals; // Number of decimals for the token
-        uint256 chainID; // Chain ID of the token
-    }
-
-    struct TokenEdit {
-        address contractAddress;
-        address submitter;
-        string name;
-        string logoURI;
-        string symbol;
-        uint8 decimals;
-        uint256 chainID;
-        uint256 editIndex;
-    }
-
-    /**********************************************************************************************
-     *  _____                 _       
-     * | ____|_   _____ _ __ | |_ ___ 
-     * |  _| \ \ / / _ \ '_ \| __/ __|
-     * | |___ \ V /  __/ | | | |_\__ \
-     * |_____| \_/ \___|_| |_|\__|___/
-     *********************************************************************************************/
-    event TokenAdded(address indexed contractAddress, string name, string symbol, string logoURI, uint8 decimals, uint256 chainID); // Event for token addition
-    event UpdateSuggested(address indexed contractAddress, string name, string symbol, string logoURI, uint8 decimals, uint256 chainID); // Event for token update
-    event TokenApproved(address indexed contractAddress, uint256 chainID); // Event for token approval
-    event TokenRejected(address indexed contractAddress, uint256 chainID); // Event for token rejection
-    event TokenEditAccepted(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID); // Event for token edit acceptance
-    event TokentrollerUpdated(address indexed newCouncil); // Event for tokentroller update
-    event TokenEditRejected(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID); // Event for token edit rejection
-
-    /**********************************************************************************************
-     * __     __         _       _     _           
-     * \ \   / /_ _ _ __(_) __ _| |__ | | ___  ___ 
+     * __     __         _       _     _
+     * \ \   / /_ _ _ __(_) __ _| |__ | | ___  ___
      *  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \/ __|
      *   \ V / (_| | |  | | (_| | |_) | |  __/\__ \
      *    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___||___/
@@ -82,8 +43,8 @@ contract TokenRegistry {
     }
 
     /**********************************************************************************************
-     *  __  __       _        _                 
-     * |  \/  |_   _| |_ __ _| |_ ___  _ __ ___ 
+     *  __  __       _        _
+     * |  \/  |_   _| |_ __ _| |_ ___  _ __ ___
      * | |\/| | | | | __/ _` | __/ _ \| '__/ __|
      * | |  | | |_| | || (_| | || (_) | |  \__ \
      * |_|  |_|\__,_|\__\__,_|\__\___/|_|  |___/
@@ -104,7 +65,14 @@ contract TokenRegistry {
      * @notice Requires the token to not already exist and have a valid address
      * @notice Checks with the Tokentroller if the token can be added
      *********************************************************************************************/
-    function addToken(address _contractAddress, string memory _name, string memory _symbol, string memory _logoURI, uint8 _decimals, uint256 _chainID) public {
+    function addToken(
+        address _contractAddress,
+        string memory _name,
+        string memory _symbol,
+        string memory _logoURI,
+        uint8 _decimals,
+        uint256 _chainID
+    ) public {
         require(tokens[_chainID][_contractAddress][0].contractAddress == address(0), "Token already exists");
         require(_contractAddress != address(0), "New token address cannot be zero");
         require(ITokentroller(tokentroller).canAddToken(_contractAddress, _chainID), "Failed to add token");
@@ -137,13 +105,20 @@ contract TokenRegistry {
      * @notice Otherwise, a new edit is suggested and stored for later approval.
      * @notice Emits a UpdateSuggested event upon successful update or edit suggestion.
      *********************************************************************************************/
-    function updateToken(address _contractAddress, string memory _name, string memory _symbol, string memory _logoURI, uint8 _decimals, uint256 _chainID) public {
+    function updateToken(
+        address _contractAddress,
+        string memory _name,
+        string memory _symbol,
+        string memory _logoURI,
+        uint8 _decimals,
+        uint256 _chainID
+    ) public {
         require(tokens[_chainID][_contractAddress][1].contractAddress != address(0), "Token does not exist");
         require(_contractAddress != address(0), "New token address cannot be zero");
-        require(ITokentroller(tokentroller).canUpdateToken(_contractAddress, _chainID), "Failed to update token");
-        
+        require(ITokentroller(tokentroller).canProposeTokenEdit(_contractAddress, _chainID), "Failed to update token");
+
         uint256 newIndex = ++editCount[_chainID][_contractAddress];
-        
+
         // Add to tokensWithEdits if this is the first edit
         if (newIndex == 1) {
             tokensWithEdits[_chainID].push(_contractAddress);
@@ -182,7 +157,7 @@ contract TokenRegistry {
         );
 
         Token memory edit = editsOnTokens[_chainID][_contractAddress][_editIndex];
-        
+
         // Update the approved token with the edit
         tokens[_chainID][_contractAddress][1] = edit;
 
@@ -191,13 +166,13 @@ contract TokenRegistry {
             delete editsOnTokens[_chainID][_contractAddress][i];
         }
         editCount[_chainID][_contractAddress] = 0;
-        
+
         _removeTokenFromEdits(_chainID, _contractAddress);
 
         emit TokenEditAccepted(_contractAddress, _editIndex, _chainID);
     }
 
-        /**********************************************************************************************
+    /**********************************************************************************************
      * @dev Function to reject a token edit
      * @param _contractAddress The contract address of the token to reject the edit for
      * @param _editIndex The index of the edit to reject
@@ -240,8 +215,8 @@ contract TokenRegistry {
     }
 
     /**********************************************************************************************
-     *     _                                        
-     *    / \   ___ ___ ___  ___ ___  ___  _ __ ___ 
+     *     _
+     *    / \   ___ ___ ___  ___ ___  ___  _ __ ___
      *   / _ \ / __/ __/ _ \/ __/ __|/ _ \| '__/ __|
      *  / ___ \ (_| (_|  __/\__ \__ \ (_) | |  \__ \
      * /_/   \_\___\___\___||___/___/\___/|_|  |___/
@@ -300,12 +275,12 @@ contract TokenRegistry {
         uint256 arraySize = _size > remainingTokens ? remainingTokens : _size;
         tokens_ = new Token[](arraySize);
 
-        uint256 found;        // Number of tokens found for the requested status
-        uint256 statusCount;  // Running count of tokens matching the status
-        
+        uint256 found; // Number of tokens found for the requested status
+        uint256 statusCount; // Running count of tokens matching the status
+
         for (uint256 i = 0; i < tokenAddresses[_chainID].length && found < arraySize; i++) {
             (Token memory token, bool exists) = _getTokenAtIndex(_chainID, i, _status);
-            
+
             if (exists) {
                 if (statusCount >= _initialIndex) {
                     tokens_[found] = token;
@@ -330,14 +305,12 @@ contract TokenRegistry {
         return tokenAddresses[_chainID].length;
     }
 
-
-
     /**********************************************************************************************
-     *  _____     _              _             _ _           
-     * |_   _|__ | | _____ _ __ | |_ _ __ ___ | | | ___ _ __ 
+     *  _____     _              _             _ _
+     * |_   _|__ | | _____ _ __ | |_ _ __ ___ | | | ___ _ __
      *   | |/ _ \| |/ / _ \ '_ \| __| '__/ _ \| | |/ _ \ '__|
-     *   | | (_) |   <  __/ | | | |_| | | (_) | | |  __/ |   
-     *   |_|\___/|_|\_\___|_| |_|\__|_|  \___/|_|_|\___|_|   
+     *   | | (_) |   <  __/ | | | |_| | | (_) | | |  __/ |
+     *   |_|\___/|_|\_\___|_| |_|\__|_|  \___/|_|_|\___|_|
      *
      * @dev All the functions below are for the tokentroller to manage the tokens in the registry.
      * All the verifications are handled by the Tokentroller contract, which can be upgraded at
@@ -353,12 +326,15 @@ contract TokenRegistry {
      *********************************************************************************************/
     function fastTrackToken(uint256 _chainID, address _contractAddress) public {
         require(tokens[_chainID][_contractAddress][0].contractAddress != address(0), "Token does not exist");
-        require(ITokentroller(tokentroller).canFastTrackToken(msg.sender, _contractAddress, _chainID), "Failed to fast-track token");
+        require(
+            ITokentroller(tokentroller).canFastTrackToken(msg.sender, _contractAddress, _chainID),
+            "Failed to fast-track token"
+        );
 
         // Move token from status 0 to status 1
         Token memory token = tokens[_chainID][_contractAddress][0];
         delete tokens[_chainID][_contractAddress][0];
-        
+
         tokens[_chainID][_contractAddress][1] = token;
 
         // Update counters
@@ -377,13 +353,16 @@ contract TokenRegistry {
      *********************************************************************************************/
     function rejectToken(uint256 _chainID, address _contractAddress) public {
         require(tokens[_chainID][_contractAddress][0].contractAddress != address(0), "Token does not exist");
-        require(ITokentroller(tokentroller).canRejectToken(msg.sender, _contractAddress, _chainID), "Failed to reject token");
+        require(
+            ITokentroller(tokentroller).canRejectToken(msg.sender, _contractAddress, _chainID),
+            "Failed to reject token"
+        );
 
         Token memory token = tokens[_chainID][_contractAddress][0];
-        
+
         // Remove from current status
         delete tokens[_chainID][_contractAddress][0];
-        
+
         // Move to rejected status (2)
         tokens[_chainID][_contractAddress][2] = token;
 
@@ -415,7 +394,9 @@ contract TokenRegistry {
      * @return uint256 rejected - The count of rejected tokens
      * @notice This function returns the counts of tokens by status for a specific chain
      *********************************************************************************************/
-    function getTokenCounts(uint256 _chainID) public view returns (uint256 pending, uint256 approved, uint256 rejected) {
+    function getTokenCounts(
+        uint256 _chainID
+    ) public view returns (uint256 pending, uint256 approved, uint256 rejected) {
         return (pendingTokenCount[_chainID], approvedTokenCount[_chainID], rejectedTokenCount[_chainID]);
     }
 
@@ -445,7 +426,7 @@ contract TokenRegistry {
     ) public {
         // First add the token using existing logic
         addToken(_contractAddress, _name, _symbol, _logoURI, _decimals, _chainID);
-        
+
         // Then set the metadata using the state variable
         metadataRegistry.setMetadataBatch(_contractAddress, _chainID, metadata);
     }
@@ -531,5 +512,20 @@ contract TokenRegistry {
     function getTokensWithEdits(uint256 _chainID, uint256 _index) public view returns (address) {
         return tokensWithEdits[_chainID][_index];
     }
-}
 
+    function proposeTokenAndMetadataEdit(
+        address _contractAddress,
+        string memory _name,
+        string memory _symbol,
+        string memory _logoURI,
+        uint8 _decimals,
+        uint256 _chainID,
+        MetadataInput[] calldata metadataUpdates
+    ) public {
+        // First propose the token edit
+        updateToken(_contractAddress, _name, _symbol, _logoURI, _decimals, _chainID);
+
+        // Then propose the metadata edit
+        metadataRegistry.proposeMetadataEdit(_contractAddress, _chainID, metadataUpdates);
+    }
+}

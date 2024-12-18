@@ -99,7 +99,7 @@ contract TokenMetadataRegistryTest is Test {
         // Add and then deactivate the field
         vm.prank(owner);
         metadataRegistry.addMetadataField("website");
-        
+
         vm.prank(owner);
         metadataRegistry.updateMetadataField("website", false);
 
@@ -132,7 +132,7 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("website");
         vm.prank(owner);
         metadataRegistry.addMetadataField("twitter");
-        
+
         // Set some metadata
         vm.prank(nonOwner);
         metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
@@ -140,16 +140,19 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.setMetadata(tokenAddress, chainID, "twitter", "@example");
 
         // Get all metadata
-        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(tokenAddress, chainID);
-        
+        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(
+            tokenAddress,
+            chainID
+        );
+
         // Verify the results
         assertEq(allMetadata.length, 2);
-        
+
         // Check fields
         assertEq(allMetadata[0].field, "website");
         assertEq(allMetadata[0].value, "https://example.com");
         assertTrue(allMetadata[0].isActive);
-        
+
         assertEq(allMetadata[1].field, "twitter");
         assertEq(allMetadata[1].value, "@example");
         assertTrue(allMetadata[1].isActive);
@@ -165,22 +168,25 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("website");
         vm.prank(owner);
         metadataRegistry.addMetadataField("twitter");
-        
+
         vm.prank(nonOwner);
         metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
         vm.prank(nonOwner);
         metadataRegistry.setMetadata(tokenAddress, chainID, "twitter", "@example");
-        
+
         // Deactivate one field
         vm.prank(owner);
         metadataRegistry.updateMetadataField("twitter", false);
-        
+
         // Get all metadata
-        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(tokenAddress, chainID);
-        
+        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(
+            tokenAddress,
+            chainID
+        );
+
         // Values should still be present but field marked as inactive
         assertEq(allMetadata.length, 2);
-        assertTrue(allMetadata[0].isActive);  // website still active
+        assertTrue(allMetadata[0].isActive); // website still active
         assertFalse(allMetadata[1].isActive); // twitter now inactive
         assertEq(allMetadata[1].value, "@example"); // value still preserved
     }
@@ -223,7 +229,6 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(owner);
         metadataRegistry.addMetadataField("website");
 
-
         uint256 chainID2 = 2;
 
         // Add same token address on different chains
@@ -253,15 +258,18 @@ contract TokenMetadataRegistryTest is Test {
         // Add token and set metadata
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
-        
+
         vm.prank(nonOwner);
         metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
         vm.prank(nonOwner);
         metadataRegistry.setMetadata(tokenAddress, chainID, "twitter", "@example");
 
         // Get all metadata for specific chain
-        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(tokenAddress, chainID);
-        
+        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(
+            tokenAddress,
+            chainID
+        );
+
         assertEq(allMetadata.length, 2);
         assertEq(allMetadata[0].field, "website");
         assertEq(allMetadata[0].value, "https://example.com");
@@ -282,14 +290,8 @@ contract TokenMetadataRegistryTest is Test {
 
         // Prepare batch metadata
         MetadataInput[] memory inputs = new MetadataInput[](2);
-        inputs[0] = MetadataInput({
-            field: "website",
-            value: "https://example.com"
-        });
-        inputs[1] = MetadataInput({
-            field: "twitter",
-            value: "@example"
-        });
+        inputs[0] = MetadataInput({ field: "website", value: "https://example.com" });
+        inputs[1] = MetadataInput({ field: "twitter", value: "@example" });
 
         // Set batch metadata
         vm.prank(nonOwner);
@@ -312,10 +314,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
-        updates[0] = MetadataInput({
-            field: "website",
-            value: "https://example.com"
-        });
+        updates[0] = MetadataInput({ field: "website", value: "https://example.com" });
 
         // Propose edit
         vm.prank(nonOwner);
@@ -327,8 +326,11 @@ contract TokenMetadataRegistryTest is Test {
         assertEq(metadataRegistry.editCount(chainID, tokenAddress), 1);
 
         // Get all proposal details in one call
-        TokenMetadataRegistry.EditProposalDetails memory proposal = 
-            metadataRegistry.getEditProposal(chainID, tokenAddress, 1);
+        TokenMetadataRegistry.EditProposalDetails memory proposal = metadataRegistry.getEditProposal(
+            chainID,
+            tokenAddress,
+            1
+        );
 
         // Verify stored proposal
         assertEq(proposal.submitter, nonOwner);
@@ -348,13 +350,9 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(owner);
         tokenRegistry.fastTrackToken(chainID, tokenAddress);
 
-
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
-        updates[0] = MetadataInput({
-            field: "website",
-            value: "https://example.com"
-        });
+        updates[0] = MetadataInput({ field: "website", value: "https://example.com" });
 
         // Propose edit
         vm.prank(nonOwner);
@@ -385,17 +383,10 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(owner);
         tokenRegistry.fastTrackToken(chainID, tokenAddress);
 
-
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](2);
-        updates[0] = MetadataInput({
-            field: "website",
-            value: "https://example.com"
-        });
-        updates[1] = MetadataInput({
-            field: "twitter",
-            value: "@example"
-        });
+        updates[0] = MetadataInput({ field: "website", value: "https://example.com" });
+        updates[1] = MetadataInput({ field: "twitter", value: "@example" });
 
         // Propose edit
         vm.prank(nonOwner);
@@ -423,13 +414,9 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(owner);
         tokenRegistry.fastTrackToken(chainID, tokenAddress);
 
-
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
-        updates[0] = MetadataInput({
-            field: "website",
-            value: "https://example.com"
-        });
+        updates[0] = MetadataInput({ field: "website", value: "https://example.com" });
 
         // Propose edit
         vm.prank(nonOwner);
@@ -461,28 +448,22 @@ contract TokenMetadataRegistryTest is Test {
 
         // Create first edit
         MetadataInput[] memory updates1 = new MetadataInput[](1);
-        updates1[0] = MetadataInput({
-            field: "website",
-            value: "https://example1.com"
-        });
+        updates1[0] = MetadataInput({ field: "website", value: "https://example1.com" });
 
         vm.prank(nonOwner);
         metadataRegistry.proposeMetadataEdit(tokenAddress, chainID, updates1);
 
         // Create second edit
         MetadataInput[] memory updates2 = new MetadataInput[](1);
-        updates2[0] = MetadataInput({
-            field: "twitter",
-            value: "@example2"
-        });
+        updates2[0] = MetadataInput({ field: "twitter", value: "@example2" });
 
         vm.prank(nonOwner2);
         metadataRegistry.proposeMetadataEdit(tokenAddress, chainID, updates2);
 
         // Test listing with pagination
-        (TokenMetadataRegistry.MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) = 
-            metadataRegistry.listAllEdits(chainID, 0, 1);
-        
+        (TokenMetadataRegistry.MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) = metadataRegistry
+            .listAllEdits(chainID, 0, 1);
+
         assertEq(edits.length, 1);
         assertEq(edits[0].submitter, nonOwner);
         assertEq(edits[0].updates[0].field, "website");
@@ -491,7 +472,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Get second page
         (edits, finalIndex, hasMore) = metadataRegistry.listAllEdits(chainID, 1, 1);
-        
+
         assertEq(edits.length, 1);
         assertEq(edits[0].submitter, nonOwner2);
         assertEq(edits[0].updates[0].field, "twitter");
@@ -512,27 +493,20 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(owner);
         tokenRegistry.fastTrackToken(chainID, token2);
 
-
         // Setup metadata fields
         vm.prank(owner);
         metadataRegistry.addMetadataField("website");
 
         // Create edit for first token
         MetadataInput[] memory updates1 = new MetadataInput[](1);
-        updates1[0] = MetadataInput({
-            field: "website",
-            value: "https://example1.com"
-        });
+        updates1[0] = MetadataInput({ field: "website", value: "https://example1.com" });
 
         vm.prank(nonOwner);
         metadataRegistry.proposeMetadataEdit(tokenAddress, chainID, updates1);
 
         // Create edit for second token
         MetadataInput[] memory updates2 = new MetadataInput[](1);
-        updates2[0] = MetadataInput({
-            field: "website",
-            value: "https://example2.com"
-        });
+        updates2[0] = MetadataInput({ field: "website", value: "https://example2.com" });
 
         vm.prank(nonOwner2);
         metadataRegistry.proposeMetadataEdit(token2, chainID, updates2);
@@ -543,9 +517,9 @@ contract TokenMetadataRegistryTest is Test {
         assertEq(metadataRegistry.getTokensMetadataWithEdits(chainID, 1), token2);
 
         // List all edits
-        (TokenMetadataRegistry.MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) = 
-            metadataRegistry.listAllEdits(chainID, 0, 10);
-        
+        (TokenMetadataRegistry.MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) = metadataRegistry
+            .listAllEdits(chainID, 0, 10);
+
         assertEq(edits.length, 2);
         assertEq(edits[0].token, tokenAddress);
         assertEq(edits[1].token, token2);
@@ -559,10 +533,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Try to propose edit with invalid field
         MetadataInput[] memory updates = new MetadataInput[](1);
-        updates[0] = MetadataInput({
-            field: "invalid_field",
-            value: "test"
-        });
+        updates[0] = MetadataInput({ field: "invalid_field", value: "test" });
 
         vm.expectRevert("Invalid field");
         metadataRegistry.proposeMetadataEdit(tokenAddress, chainID, updates);

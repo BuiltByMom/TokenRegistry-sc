@@ -8,29 +8,6 @@ import "./interfaces/ITokenMetadataRegistry.sol";
 contract TokenMetadataRegistry is ITokenMetadataRegistry {
     address public tokentroller;
 
-    struct EditParams {
-        uint256 chainID;
-        uint256 initialIndex;
-        uint256 size;
-        uint256 totalEdits;
-    }
-
-    struct MetadataEditProposal {
-        address submitter;
-        MetadataInput[] updates;
-        uint256 chainID;
-        uint256 timestamp;
-    }
-
-    struct MetadataEditInfo {
-        address token;
-        address submitter;
-        MetadataInput[] updates;
-        uint256 chainID;
-        uint256 editIndex;
-        uint256 timestamp;
-    }
-
     MetadataField[] public metadataFields;
     mapping(string => uint256) public fieldIndices;
     mapping(uint256 => mapping(address => mapping(string => string))) public tokenMetadata;
@@ -39,32 +16,16 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
     mapping(uint256 => mapping(address => uint256)) public editCount;
     mapping(uint256 => address[]) public tokensMetadataWithEdits;
 
-    event MetadataFieldAdded(string name);
-    event MetadataFieldUpdated(string name, bool isActive);
-    event MetadataValueSet(address indexed token, uint256 indexed chainID, string field, string value);
-
-    event TokentrollerUpdated(address indexed newTokentroller);
-
-    event MetadataEditProposed(address indexed token, uint256 indexed chainID, address submitter, MetadataInput[] updates);
-    event MetadataEditAccepted(address indexed token, uint256 indexed editIndex, uint256 chainID);
-    event MetadataEditRejected(address indexed token, uint256 indexed editIndex, uint256 chainID);
-
     constructor(address _tokentroller) {
         tokentroller = _tokentroller;
     }
 
-    function addMetadataField(
-        string calldata name
-    ) external {
+    function addMetadataField(string calldata name) external {
         require(ITokentroller(tokentroller).canAddMetadataField(msg.sender, name), "Not authorized");
         require(bytes(name).length > 0, "Empty field name");
         require(fieldIndices[name] == 0, "Field already exists");
 
-        MetadataField memory newField = MetadataField({
-            name: name,
-            isActive: true,
-            updatedAt: block.timestamp
-        });
+        MetadataField memory newField = MetadataField({ name: name, isActive: true, updatedAt: block.timestamp });
 
         metadataFields.push(newField);
         fieldIndices[name] = metadataFields.length;
@@ -72,37 +33,25 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         emit MetadataFieldAdded(name);
     }
 
-    function updateMetadataField(
-        string calldata name,
-        bool isActive
-    ) external {
+    function updateMetadataField(string calldata name, bool isActive) external {
         require(ITokentroller(tokentroller).canUpdateMetadataField(msg.sender, name, isActive), "Not authorized");
         uint256 index = fieldIndices[name];
         require(index > 0, "Field does not exist");
-        
+
         metadataFields[index - 1].isActive = isActive;
         emit MetadataFieldUpdated(name, isActive);
     }
 
-    function setMetadata(
-        address token,
-        uint256 chainID,
-        string calldata field,
-        string calldata value
-    ) external {
+    function setMetadata(address token, uint256 chainID, string calldata field, string calldata value) external {
         require(ITokentroller(tokentroller).canSetMetadata(msg.sender, token, chainID, field), "Not authorized");
         require(_isValidField(field), "Invalid field");
         tokenMetadata[chainID][token][field] = value;
         emit MetadataValueSet(token, chainID, field, value);
     }
 
-    function setMetadataBatch(
-        address token,
-        uint256 chainID,
-        MetadataInput[] calldata metadata
-    ) external {
+    function setMetadataBatch(address token, uint256 chainID, MetadataInput[] calldata metadata) external {
         require(ITokentroller(tokentroller).canSetMetadata(msg.sender, token, chainID, ""), "Not authorized");
-        
+
         for (uint256 i = 0; i < metadata.length; i++) {
             require(_isValidField(metadata[i].field), "Invalid field");
             tokenMetadata[chainID][token][metadata[i].field] = metadata[i].value;
@@ -110,11 +59,7 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         }
     }
 
-    function getMetadata(
-        address token,
-        uint256 chainID,
-        string calldata field
-    ) external view returns (string memory) {
+    function getMetadata(address token, uint256 chainID, string calldata field) external view returns (string memory) {
         return tokenMetadata[chainID][token][field];
     }
 
@@ -122,12 +67,10 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         return metadataFields;
     }
 
-    function _isValidField(
-        string memory field
-    ) internal view returns (bool) {
+    function _isValidField(string memory field) internal view returns (bool) {
         uint256 index = fieldIndices[field];
         if (index == 0) return false;
-        
+
         return metadataFields[index - 1].isActive;
     }
 
@@ -138,13 +81,10 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
     }
 
     // Add this new function
-    function getAllMetadata(
-        address token,
-        uint256 chainID
-    ) external view returns (MetadataValue[] memory) {
+    function getAllMetadata(address token, uint256 chainID) external view returns (MetadataValue[] memory) {
         MetadataField[] memory fields = metadataFields;
         MetadataValue[] memory values = new MetadataValue[](fields.length);
-        
+
         for (uint256 i = 0; i < fields.length; i++) {
             values[i] = MetadataValue({
                 field: fields[i].name,
@@ -152,25 +92,24 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
                 isActive: fields[i].isActive
             });
         }
-        
+
         return values;
     }
 
-    function proposeMetadataEdit(
-        address token,
-        uint256 chainID,
-        MetadataInput[] calldata updates
-    ) external {
-        require(ITokentroller(tokentroller).canProposeMetadataEdit(msg.sender, token, chainID, updates), "Not authorized");
+    function proposeMetadataEdit(address token, uint256 chainID, MetadataInput[] calldata updates) external {
+        require(
+            ITokentroller(tokentroller).canProposeMetadataEdit(msg.sender, token, chainID, updates),
+            "Not authorized"
+        );
         require(updates.length > 0, "No updates provided");
-        
+
         // Validate all fields
         for (uint256 i = 0; i < updates.length; i++) {
             require(_isValidField(updates[i].field), "Invalid field");
         }
 
         uint256 newIndex = ++editCount[chainID][token];
-        
+
         // Add to tokensMetadataWithEdits if this is the first edit
         if (newIndex == 1) {
             tokensMetadataWithEdits[chainID].push(token);
@@ -181,7 +120,7 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         proposal.submitter = msg.sender;
         proposal.chainID = chainID;
         proposal.timestamp = block.timestamp;
-        
+
         // Store updates
         for (uint256 i = 0; i < updates.length; i++) {
             proposal.updates.push(updates[i]);
@@ -201,17 +140,16 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         }
     }
 
-    function acceptMetadataEdit(
-        address token,
-        uint256 chainID,
-        uint256 editIndex
-    ) external {
-        require(ITokentroller(tokentroller).canAcceptMetadataEdit(msg.sender, token, chainID, editIndex), "Not authorized");
+    function acceptMetadataEdit(address token, uint256 chainID, uint256 editIndex) external {
+        require(
+            ITokentroller(tokentroller).canAcceptMetadataEdit(msg.sender, token, chainID, editIndex),
+            "Not authorized"
+        );
         require(editIndex <= editCount[chainID][token], "Invalid edit index");
         require(editCount[chainID][token] > 0, "No edit exists");
 
         MetadataEditProposal storage edit = editsOnTokens[chainID][token][editIndex];
-        
+
         // Apply all updates
         for (uint256 i = 0; i < edit.updates.length; i++) {
             tokenMetadata[chainID][token][edit.updates[i].field] = edit.updates[i].value;
@@ -223,18 +161,17 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
             delete editsOnTokens[chainID][token][i];
         }
         editCount[chainID][token] = 0;
-        
+
         _removeTokenFromEdits(chainID, token);
 
         emit MetadataEditAccepted(token, editIndex, chainID);
     }
 
-    function rejectMetadataEdit(
-        address token,
-        uint256 chainID,
-        uint256 editIndex
-    ) external {
-        require(ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, token, chainID, editIndex), "Not authorized");
+    function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex) external {
+        require(
+            ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, token, chainID, editIndex),
+            "Not authorized"
+        );
         require(editIndex <= editCount[chainID][token], "Invalid edit index");
         require(editCount[chainID][token] > 0, "No edit exists");
 
@@ -328,11 +265,12 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         uint256 editIndex
     ) external view returns (EditProposalDetails memory) {
         MetadataEditProposal storage proposal = editsOnTokens[chainID][token][editIndex];
-        return EditProposalDetails({
-            submitter: proposal.submitter,
-            updates: proposal.updates,
-            chainID: proposal.chainID,
-            timestamp: proposal.timestamp
-        });
+        return
+            EditProposalDetails({
+                submitter: proposal.submitter,
+                updates: proposal.updates,
+                chainID: proposal.chainID,
+                timestamp: proposal.timestamp
+            });
     }
 }
