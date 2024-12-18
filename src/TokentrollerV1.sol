@@ -1,25 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./interfaces/ITokentroller.sol";
 import "./TokenRegistry.sol";
 import "./TokenMetadataRegistry.sol";
 
-interface ITokenRegistry {
-    struct Token {
-        address contractAddress; // Address of the token
-        address submitter; // Address of the submitter
-        string name; // Name of the token
-        string logoURI; // URI of the token's logo
-        string symbol; // Symbol of the token
-        uint8 decimals; // Number of decimals for the token
-        uint8 status; // Status indicating whether the token is pending approval [0], approved [1], rejected [2]
-        uint256 chainID; // Chain ID of the token
-    }
-    function getToken(uint256 _chainID, address _contractAddress) external view returns (Token memory);
-    function updateTokentroller(address _newTokentroller) external;
-}
-
-contract TokentrollerV1 {
+contract TokentrollerV1 is ITokentroller {
     address public tokenRegistry;
     address public metadataRegistry;
     address public owner;
@@ -33,8 +19,8 @@ contract TokentrollerV1 {
 	 *********************************************************************************************/
     constructor(address _owner) {
         owner = _owner;
-        tokenRegistry = address(new TokenRegistry(address(this)));
         metadataRegistry = address(new TokenMetadataRegistry(address(this)));
+        tokenRegistry = address(new TokenRegistry(address(this), metadataRegistry));
     }
 
 
@@ -60,7 +46,21 @@ contract TokentrollerV1 {
         require(msg.sender == owner, "Only the owner can call this function");
         require(_newTokentroller != address(0), "New tokentroller address cannot be zero");
         require(_newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
-        ITokenRegistry(tokenRegistry).updateTokentroller(_newTokentroller);
+        TokenRegistry(tokenRegistry).updateTokentroller(_newTokentroller);
+    }
+
+    /**********************************************************************************************
+     * @dev Updates the tokentroller address in the TokenMetadataRegistry contract
+     * @param _newTokentroller The address of the new tokentroller
+     * @notice This function can only be called by the owner
+     * @notice The new tokentroller address must not be zero or the current contract address
+     * @notice Calls the updateTokentroller function in the TokenRegistry contract
+     *********************************************************************************************/
+    function updateMetadataRegistryTokentroller(address _newTokentroller) public {
+        require(msg.sender == owner, "Only the owner can call this function");
+        require(_newTokentroller != address(0), "New tokentroller address cannot be zero");
+        require(_newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
+        TokenMetadataRegistry(metadataRegistry).updateTokentroller(_newTokentroller);
     }
 
 	/**********************************************************************************************
@@ -151,29 +151,71 @@ contract TokentrollerV1 {
         return true;
     }
 
-    /**********************************************************************************************
-     * @dev Adds a new metadata field to the registry for a specific chain
-     * @param chainId The ID of the chain to add the field to
-     * @param name The name of the metadata field
-     * @param isRequired Whether the field is required for tokens
-     * @notice This function can only be called by the owner
-     * @notice Calls the addMetadataField function in the TokenMetadataRegistry contract
-     *********************************************************************************************/
-    function addMetadataField(uint256 chainId, string calldata name, bool isRequired) external {
-        require(msg.sender == owner, "Only owner can call");
-        TokenMetadataRegistry(metadataRegistry).addMetadataField(chainId, name, isRequired);
-}
+    function canAddMetadataField(
+        address sender,
+        string calldata name
+    ) external view returns (bool) {
+        return sender == owner;
+    }
 
-    /**********************************************************************************************
-     * @dev Updates the active status of an existing metadata field
-     * @param chainId The ID of the chain containing the field
-     * @param name The name of the metadata field to update
-     * @param isActive The new active status for the field
-     * @notice This function can only be called by the owner
-     * @notice Calls the updateMetadataField function in the TokenMetadataRegistry contract
-     *********************************************************************************************/
-    function updateMetadataField(uint256 chainId, string calldata name, bool isActive)external {
-        require(msg.sender == owner, "Only owner can call");
-        TokenMetadataRegistry(metadataRegistry).updateMetadataField(chainId, name, isActive);
+    function canUpdateMetadataField(
+        address sender,
+        string calldata name,
+        bool isActive
+    ) external view returns (bool) {
+        return sender == owner;
+    }
+
+    // FIXME: check if method is safe
+    function canSetMetadata(
+        address sender,
+        address token,
+        uint256 chainID,
+        string calldata field
+    ) external view returns (bool) {
+        TokenRegistry registry = TokenRegistry(tokenRegistry);
+        // Check pending tokens first
+        (address contractAddress, address submitter, , , , ,) = registry.tokens(chainID, token, 0);
+        if (submitter == sender) return true;
+        
+        // Check approved tokens
+        (contractAddress, submitter, , , , ,) = registry.tokens(chainID, token, 1);
+        if (contractAddress != address(0)) {
+            // Token is approved, only allow edits through proposal system
+            return false;
+        }
+        
+        // Allow new token submissions
+        return submitter == address(0);
+    }
+
+    function canProposeMetadataEdit(
+        address sender,
+        address token,
+        uint256 chainID,
+        MetadataInput[] calldata updates
+    ) external view returns (bool) {
+        // Allow anyone to propose edits for approved tokens
+        TokenRegistry registry = TokenRegistry(tokenRegistry);
+        (address contractAddress,,,,,,) = registry.tokens(chainID, token, 1);
+        return contractAddress != address(0);
+    }
+
+    function canAcceptMetadataEdit(
+        address sender,
+        address token,
+        uint256 chainID,
+        uint256 editIndex
+    ) external view returns (bool) {
+        return sender == owner;
+    }
+
+    function canRejectTokenEdit(
+        address sender,
+        address token,
+        uint256 chainID,
+        uint256 editIndex
+    ) external view returns (bool) {
+        return sender == owner;
     }
 }

@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+import "./ISharedTypes.sol";
+
+interface ITokentroller {
+    // TokenRegistry hooks
+    function canFastTrackToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
+    function canRejectToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
+    function canAddToken(address contractAddress, uint256 chainID) external view returns (bool);
+    function canUpdateToken(address contractAddress, uint256 chainID) external view returns (bool);
+    function canAcceptTokenEdit(address contractAddress, uint256 chainID, uint256 editIndex) external view returns (bool);
+    
+    // TokenMetadataRegistry hooks - removed chainId
+    function canAddMetadataField(address sender, string calldata name) external view returns (bool);
+    function canUpdateMetadataField(address sender, string calldata name, bool isActive) external view returns (bool);
+    function canSetMetadata(
+        address sender,
+        address token,
+        uint256 chainID,
+        string calldata field
+    ) external view returns (bool);
+
+    // Add new function for metadata edit proposals
+    function canProposeMetadataEdit(
+        address user, 
+        address token, 
+        uint256 chainID, 
+        MetadataInput[] calldata updates
+    ) external view returns (bool);
+
+    function canAcceptMetadataEdit(
+        address sender,
+        address token,
+        uint256 chainID,
+        uint256 editIndex
+    ) external view returns (bool);
+
+    function canRejectTokenEdit(
+        address sender, 
+        address token, 
+        uint256 chainID, 
+        uint256 editIndex
+    ) external view returns (bool);
+} 
