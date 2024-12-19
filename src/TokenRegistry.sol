@@ -73,9 +73,19 @@ contract TokenRegistry is ITokenRegistry {
         uint8 _decimals,
         uint256 _chainID
     ) public {
-        require(tokens[_chainID][_contractAddress][0].contractAddress == address(0), "Token already exists");
+        require(
+            tokens[_chainID][_contractAddress][0].contractAddress == address(0) &&
+                tokens[_chainID][_contractAddress][1].contractAddress == address(0),
+            "Token already exists in pending or approved state"
+        );
         require(_contractAddress != address(0), "New token address cannot be zero");
         require(ITokentroller(tokentroller).canAddToken(_contractAddress, _chainID), "Failed to add token");
+
+        // FIXME: uncomment
+        // if (tokens[_chainID][_contractAddress][2].contractAddress != address(0)) {
+        //     delete tokens[_chainID][_contractAddress][2];
+        //     rejectedTokenCount[_chainID]--;
+        // }
 
         Token memory newToken = Token({
             contractAddress: _contractAddress,
@@ -88,6 +98,7 @@ contract TokenRegistry is ITokenRegistry {
         });
 
         tokens[_chainID][_contractAddress][0] = newToken;
+        // FIXME: do we need to push when it's rejection resubmission?
         tokenAddresses[_chainID].push(_contractAddress);
         pendingTokenCount[_chainID]++;
         emit TokenAdded(_contractAddress, _name, _symbol, _logoURI, _decimals, _chainID);
@@ -177,11 +188,17 @@ contract TokenRegistry is ITokenRegistry {
      * @param _contractAddress The contract address of the token to reject the edit for
      * @param _editIndex The index of the edit to reject
      * @param _chainID The chain ID of the token
+     * @param _reason The reason for rejection
      * @notice This function can only be called by the tokentroller
      * @notice The token must exist in the registry and the edit index must be valid
      * @notice Emits a TokenEditRejected event upon successful rejection
      *********************************************************************************************/
-    function rejectTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) public {
+    function rejectTokenEdit(
+        address _contractAddress,
+        uint256 _editIndex,
+        uint256 _chainID,
+        string calldata _reason
+    ) public {
         require(tokens[_chainID][_contractAddress][1].contractAddress != address(0), "Token does not exist");
         require(_editIndex <= editCount[_chainID][_contractAddress], "Invalid edit index");
         require(
@@ -198,7 +215,7 @@ contract TokenRegistry is ITokenRegistry {
             _removeTokenFromEdits(_chainID, _contractAddress);
         }
 
-        emit TokenEditRejected(_contractAddress, _editIndex, _chainID);
+        emit TokenEditRejected(_contractAddress, _editIndex, _chainID, _reason);
     }
 
     // Internal function to remove token from tokensWithEdits

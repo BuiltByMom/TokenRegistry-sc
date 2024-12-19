@@ -424,7 +424,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Reject edit
         vm.prank(owner);
-        metadataRegistry.rejectMetadataEdit(tokenAddress, chainID, 1);
+        metadataRegistry.rejectMetadataEdit(tokenAddress, chainID, 1, "Invalid website URL");
 
         // Verify tracking was cleared
         assertEq(metadataRegistry.tokensMetadataWithEditsLength(chainID), 0);

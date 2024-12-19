@@ -167,7 +167,7 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         emit MetadataEditAccepted(token, editIndex, chainID);
     }
 
-    function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex) external {
+    function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex, string calldata reason) external {
         require(
             ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, token, chainID, editIndex),
             "Not authorized"
@@ -184,7 +184,7 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
             _removeTokenFromEdits(chainID, token);
         }
 
-        emit MetadataEditRejected(token, editIndex, chainID);
+        emit MetadataEditRejected(token, editIndex, chainID, reason);
     }
 
     function listAllEdits(

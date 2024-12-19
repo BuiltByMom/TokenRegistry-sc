@@ -513,7 +513,7 @@ contract TokenRegistryTest is Test {
 
         // Reject the edit
         vm.prank(owner);
-        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID);
+        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID, "Invalid token symbol");
 
         // Verify edit was cleared
         (address contractAddress, , , , , , ) = tokenRegistry.editsOnTokens(chainID, tokenAddress, 1);
@@ -534,7 +534,7 @@ contract TokenRegistryTest is Test {
         // Try to reject without permission
         vm.prank(nonOwner);
         vm.expectRevert("Failed to reject token edit");
-        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID);
+        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID, "Invalid token symbol");
     }
 
     function testAcceptTokenEditClearsOtherEdits() public {
@@ -644,7 +644,7 @@ contract TokenRegistryTest is Test {
 
         // Reject the edit
         vm.prank(owner);
-        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID);
+        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID, "Invalid token symbol");
 
         // Verify token is no longer tracked
         assertEq(tokenRegistry.tokensWithEditsLength(chainID), 0);
@@ -772,5 +772,89 @@ contract TokenRegistryTest is Test {
 
         assertEq(metadataEdits.length, 1);
         assertEq(metadataEdits[0].updates[0].value, "https://example.com");
+    }
+
+    function testResubmitRejectedToken() public {
+        // First submission
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+
+        // Reject the token
+        vm.prank(owner);
+        tokenRegistry.rejectToken(chainID, tokenAddress);
+
+        // Verify token is rejected
+        (address contractAddress, , , , , , ) = tokenRegistry.tokens(chainID, tokenAddress, 2); // status 2 = rejected
+        assertEq(contractAddress, tokenAddress);
+        assertEq(tokenRegistry.rejectedTokenCount(chainID), 1);
+        assertEq(tokenRegistry.pendingTokenCount(chainID), 0);
+
+        // Resubmit the token with updated information
+        vm.prank(nonOwner2);
+        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
+
+        // Verify token is now pending and rejected state is cleaned up
+        (
+            address contractAddressPending,
+            address submitter,
+            string memory name,
+            string memory logoURI,
+            string memory symbol,
+            uint8 decimals,
+            uint256 chainId
+        ) = tokenRegistry.tokens(chainID, tokenAddress, 0);
+        assertEq(contractAddressPending, tokenAddress);
+        assertEq(name, "Test Token V2");
+        assertEq(symbol, "TEST2");
+        assertEq(tokenRegistry.pendingTokenCount(chainID), 1);
+        assertEq(tokenRegistry.rejectedTokenCount(chainID), 0);
+
+        // Verify rejected state is cleared
+        (contractAddress, , , , , , ) = tokenRegistry.tokens(chainID, tokenAddress, 2);
+        assertEq(contractAddress, address(0));
+    }
+
+    function testResubmitRejectedTokenCannotBypassApproval() public {
+        // First submission
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+
+        // Reject the token
+        vm.prank(owner);
+        tokenRegistry.rejectToken(chainID, tokenAddress);
+
+        // Resubmit and try to fast-track without proper authorization
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
+
+        vm.prank(nonOwner);
+        vm.expectRevert("Only the owner can call this function");
+        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+    }
+
+    function testCannotResubmitPendingToken() public {
+        // First submission
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+
+        // Try to resubmit while still pending
+        vm.prank(nonOwner);
+        vm.expectRevert("Token already exists in pending or approved state");
+        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
+    }
+
+    function testCannotResubmitApprovedToken() public {
+        // First submission
+        vm.prank(nonOwner);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+
+        // Approve the token
+        vm.prank(owner);
+        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+
+        // Try to resubmit while approved
+        vm.prank(nonOwner);
+        vm.expectRevert("Token already exists in pending or approved state");
+        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
     }
 }

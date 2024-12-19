@@ -59,7 +59,7 @@ interface ITokenMetadataRegistry {
         MetadataInput[] updates
     );
     event MetadataEditAccepted(address indexed token, uint256 indexed editIndex, uint256 chainID);
-    event MetadataEditRejected(address indexed token, uint256 indexed editIndex, uint256 chainID);
+    event MetadataEditRejected(address indexed token, uint256 indexed editIndex, uint256 chainID, string reason);
 
     function addMetadataField(string calldata name) external;
     function updateMetadataField(string calldata name, bool isActive) external;
@@ -70,7 +70,7 @@ interface ITokenMetadataRegistry {
     function getAllMetadata(address token, uint256 chainID) external view returns (MetadataValue[] memory);
     function proposeMetadataEdit(address token, uint256 chainID, MetadataInput[] calldata updates) external;
     function acceptMetadataEdit(address token, uint256 chainID, uint256 editIndex) external;
-    function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex) external;
+    function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex, string calldata reason) external;
     function getEditProposal(
         uint256 chainID,
         address token,

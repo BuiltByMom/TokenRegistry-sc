@@ -45,7 +45,7 @@ interface ITokenRegistry {
     event TokenRejected(address indexed contractAddress, uint256 chainID);
     event TokenEditAccepted(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID);
     event TokentrollerUpdated(address indexed newCouncil);
-    event TokenEditRejected(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID);
+    event TokenEditRejected(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID, string reason);
 
     function addToken(
         address _contractAddress,
@@ -64,7 +64,12 @@ interface ITokenRegistry {
         uint256 _chainID
     ) external;
     function acceptTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) external;
-    function rejectTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) external;
+    function rejectTokenEdit(
+        address _contractAddress,
+        uint256 _editIndex,
+        uint256 _chainID,
+        string calldata _reason
+    ) external;
     function fastTrackToken(uint256 _chainID, address _contractAddress) external;
     function rejectToken(uint256 _chainID, address _contractAddress) external;
     function updateTokentroller(address _newTokentroller) external;
