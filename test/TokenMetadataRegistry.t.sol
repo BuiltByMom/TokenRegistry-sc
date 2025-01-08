@@ -216,7 +216,7 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Try to set metadata directly for approved token
         vm.prank(nonOwner);
@@ -310,7 +310,7 @@ contract TokenMetadataRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -348,7 +348,7 @@ contract TokenMetadataRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -381,7 +381,7 @@ contract TokenMetadataRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](2);
@@ -412,7 +412,7 @@ contract TokenMetadataRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -444,7 +444,7 @@ contract TokenMetadataRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create first edit
         MetadataInput[] memory updates1 = new MetadataInput[](1);
@@ -486,12 +486,12 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token 2", "TEST", "logo", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         vm.prank(nonOwner);
         tokenRegistry.addToken(token2, "Test Token 2", "TEST", "logo", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, token2);
+        tokenRegistry.approveToken(chainID, token2);
 
         // Setup metadata fields
         vm.prank(owner);
@@ -529,7 +529,7 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token 2", "TEST", "logo", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Try to propose edit with invalid field
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -543,7 +543,7 @@ contract TokenMetadataRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token 2", "TEST", "logo", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Try to propose edit with no updates
         MetadataInput[] memory updates = new MetadataInput[](0);

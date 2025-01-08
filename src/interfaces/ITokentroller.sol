@@ -6,7 +6,7 @@ interface ITokentroller {
     event OwnerUpdated(address indexed oldOwner, address indexed newOwner);
 
     // TokenRegistry hooks
-    function canFastTrackToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
+    function canApproveToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
     function canRejectToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
     function canAddToken(address contractAddress, uint256 chainID) external view returns (bool);
     function canProposeTokenEdit(address contractAddress, uint256 chainID) external view returns (bool);

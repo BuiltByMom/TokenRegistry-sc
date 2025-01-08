@@ -95,13 +95,13 @@ contract TokentrollerV1 is ITokentroller {
      *********************************************************************************************/
 
     /**********************************************************************************************
-     * @dev Checks if a token can be fast-tracked for approval
-     * @param _contractAddress The address of the token to potentially fast-track
+     * @dev Checks if a token can be approved
+     * @param _contractAddress The address of the token to potentially approve
      * @notice This function is called by the TokenRegistry contract
-     * @notice It should implement any necessary checks before allowing fast-tracking
-     * @return bool Returns true if the token can be fast-tracked, false otherwise
+     * @notice It should implement any necessary checks before allowing approval
+     * @return bool Returns true if the token can be approved, false otherwise
      *********************************************************************************************/
-    function canFastTrackToken(address _sender, address _contractAddress, uint256 _chainID) public view returns (bool) {
+    function canApproveToken(address _sender, address _contractAddress, uint256 _chainID) public view returns (bool) {
         require(_sender == owner, "Only the owner can call this function");
         return true;
     }

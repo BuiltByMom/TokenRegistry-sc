@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "src/TokenRegistry.sol";
 import "src/TokentrollerV1.sol";
+import "src/interfaces/ITokenRegistry.sol";
 
 contract TokenRegistryTest is Test {
     TokenRegistry tokenRegistry;
@@ -15,6 +16,8 @@ contract TokenRegistryTest is Test {
     address nonOwner2 = address(3);
     address tokenAddress = address(4);
     uint256 chainID = 1;
+
+    event TokenRejected(address indexed contractAddress, uint256 chainID, string reason);
 
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
@@ -50,11 +53,18 @@ contract TokenRegistryTest is Test {
 
         // Fast track the token to approved status
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Now update the approved token
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
 
         // Check that the edit is stored in editsOnTokens, not directly updated
         (
@@ -81,7 +91,14 @@ contract TokenRegistryTest is Test {
         // Try to update pending token
         vm.prank(nonOwner);
         vm.expectRevert("Token does not exist");
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
     }
 
     function testCannotUpdateRejectedToken() public {
@@ -90,20 +107,27 @@ contract TokenRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress);
+        tokenRegistry.rejectToken(chainID, tokenAddress, "Test reason");
 
         // Try to update rejected token
         vm.prank(nonOwner);
         vm.expectRevert("Token does not exist");
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
     }
 
-    function testFastTrackToken() public {
+    function testApproveToken() public {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         (
             address contractAddress,
@@ -121,8 +145,12 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
+        string memory reason = "Token does not meet listing criteria";
+        vm.expectEmit(true, false, false, true);
+        emit TokenRejected(tokenAddress, chainID, reason);
+
         vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress);
+        tokenRegistry.rejectToken(chainID, tokenAddress, reason);
 
         (
             address contractAddress,
@@ -189,7 +217,7 @@ contract TokenRegistryTest is Test {
 
             if (i % 2 == 0) {
                 vm.prank(owner);
-                tokenRegistry.fastTrackToken(chainID, address(uint160(i + 10)));
+                tokenRegistry.approveToken(chainID, address(uint160(i + 10)));
             }
         }
 
@@ -228,10 +256,17 @@ contract TokenRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         vm.prank(nonOwner2);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
 
         vm.prank(owner);
         tokenRegistry.acceptTokenEdit(tokenAddress, 1, chainID);
@@ -303,7 +338,7 @@ contract TokenRegistryTest is Test {
 
         // Fast track the first token
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(1, address(1));
+        tokenRegistry.approveToken(1, address(1));
         (pending, approved, rejected) = tokenRegistry.getTokenCounts(1);
         assertEq(pending, 1); // One token still pending
         assertEq(approved, 1);
@@ -311,7 +346,7 @@ contract TokenRegistryTest is Test {
 
         // Reject the second token
         vm.prank(owner);
-        tokenRegistry.rejectToken(1, address(2));
+        tokenRegistry.rejectToken(1, address(2), "Test reason");
         (pending, approved, rejected) = tokenRegistry.getTokenCounts(1);
         assertEq(pending, 0);
         assertEq(approved, 1);
@@ -335,7 +370,7 @@ contract TokenRegistryTest is Test {
         assertEq(rejected2, 0);
 
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(1, address(1));
+        tokenRegistry.approveToken(1, address(1));
 
         (pending1, approved1, rejected1) = tokenRegistry.getTokenCounts(1);
         assertEq(pending1, 0);
@@ -362,11 +397,11 @@ contract TokenRegistryTest is Test {
             );
         }
 
-        // First fast track even numbered tokens (0,2,4,6,8)
+        // First approve even numbered tokens (0,2,4,6,8)
         for (uint256 i = 0; i < 10; i++) {
             if (i % 2 == 0) {
                 vm.prank(owner);
-                tokenRegistry.fastTrackToken(chainID, address(uint160(i + 10)));
+                tokenRegistry.approveToken(chainID, address(uint160(i + 10)));
             }
         }
 
@@ -374,7 +409,7 @@ contract TokenRegistryTest is Test {
         for (uint256 i = 0; i < 10; i++) {
             if (i % 2 != 0 && i % 3 == 0) {
                 vm.prank(owner);
-                tokenRegistry.rejectToken(chainID, address(uint160(i + 10)));
+                tokenRegistry.rejectToken(chainID, address(uint160(i + 10)), "Test reason");
             }
         }
 
@@ -424,10 +459,10 @@ contract TokenRegistryTest is Test {
 
             if (i % 3 == 0) {
                 vm.prank(owner);
-                tokenRegistry.fastTrackToken(chainID, address(uint160(i + 10)));
+                tokenRegistry.approveToken(chainID, address(uint160(i + 10)));
             } else if (i % 3 == 1) {
                 vm.prank(owner);
-                tokenRegistry.rejectToken(chainID, address(uint160(i + 10)));
+                tokenRegistry.rejectToken(chainID, address(uint160(i + 10)), "Test reason");
             }
         }
 
@@ -505,11 +540,18 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create edit
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
 
         // Reject the edit
         vm.prank(owner);
@@ -525,11 +567,18 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create edit
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
 
         // Try to reject without permission
         vm.prank(nonOwner);
@@ -542,13 +591,27 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create multiple edits
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token 1", "UT1", "https://example.com/logo1.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token 1",
+            "UT1",
+            "https://example.com/logo1.png",
+            9,
+            chainID
+        );
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token 2", "UT2", "https://example.com/logo2.png", 12, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token 2",
+            "UT2",
+            "https://example.com/logo2.png",
+            12,
+            chainID
+        );
 
         // Accept first edit
         vm.prank(owner);
@@ -567,14 +630,21 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Verify no edits initially
         assertEq(tokenRegistry.tokensWithEditsLength(chainID), 0);
 
         // Create first edit
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
 
         // Verify token is tracked
         assertEq(tokenRegistry.tokensWithEditsLength(chainID), 1);
@@ -583,7 +653,7 @@ contract TokenRegistryTest is Test {
 
         // Create second edit
         vm.prank(nonOwner2);
-        tokenRegistry.updateToken(
+        tokenRegistry.proposeTokenEdit(
             tokenAddress,
             "Updated Token 2",
             "UTK2",
@@ -602,13 +672,27 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create multiple edits
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token 1", "UT1", "https://example.com/logo1.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token 1",
+            "UT1",
+            "https://example.com/logo1.png",
+            9,
+            chainID
+        );
         vm.prank(nonOwner2);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token 2", "UT2", "https://example.com/logo2.png", 12, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token 2",
+            "UT2",
+            "https://example.com/logo2.png",
+            12,
+            chainID
+        );
 
         // Test listing with pagination
         (TokenRegistry.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenRegistry.listAllEdits(
@@ -636,11 +720,18 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create an edit
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token",
+            "UTK",
+            "https://example.com/new_logo.png",
+            9,
+            chainID
+        );
 
         // Reject the edit
         vm.prank(owner);
@@ -661,13 +752,13 @@ contract TokenRegistryTest is Test {
         vm.stopPrank();
 
         vm.startPrank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
-        tokenRegistry.fastTrackToken(chainID, token2);
+        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, token2);
         vm.stopPrank();
 
         // Create edits for both tokens
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(
+        tokenRegistry.proposeTokenEdit(
             tokenAddress,
             "Updated Token 1",
             "UT1",
@@ -676,7 +767,14 @@ contract TokenRegistryTest is Test {
             chainID
         );
         vm.prank(nonOwner2);
-        tokenRegistry.updateToken(token2, "Updated Token 2", "UT2", "https://example.com/new_logo2.png", 12, chainID);
+        tokenRegistry.proposeTokenEdit(
+            token2,
+            "Updated Token 2",
+            "UT2",
+            "https://example.com/new_logo2.png",
+            12,
+            chainID
+        );
 
         // Verify tracking
         assertEq(tokenRegistry.tokensWithEditsLength(chainID), 2);
@@ -700,13 +798,27 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Create multiple edits
         vm.prank(nonOwner);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token 1", "UT1", "https://example.com/logo1.png", 9, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token 1",
+            "UT1",
+            "https://example.com/logo1.png",
+            9,
+            chainID
+        );
         vm.prank(nonOwner2);
-        tokenRegistry.updateToken(tokenAddress, "Updated Token 2", "UT2", "https://example.com/logo2.png", 12, chainID);
+        tokenRegistry.proposeTokenEdit(
+            tokenAddress,
+            "Updated Token 2",
+            "UT2",
+            "https://example.com/logo2.png",
+            12,
+            chainID
+        );
 
         // Accept first edit
         vm.prank(owner);
@@ -731,7 +843,7 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Setup metadata field
         vm.prank(owner);
@@ -781,7 +893,7 @@ contract TokenRegistryTest is Test {
 
         // Reject the token
         vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress);
+        tokenRegistry.rejectToken(chainID, tokenAddress, "Test reason");
 
         // Verify token is rejected
         (address contractAddress, , , , , , ) = tokenRegistry.tokens(chainID, tokenAddress, 2); // status 2 = rejected
@@ -821,7 +933,7 @@ contract TokenRegistryTest is Test {
 
         // Reject the token
         vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress);
+        tokenRegistry.rejectToken(chainID, tokenAddress, "Test reason");
 
         // Resubmit and try to fast-track without proper authorization
         vm.prank(nonOwner);
@@ -829,7 +941,7 @@ contract TokenRegistryTest is Test {
 
         vm.prank(nonOwner);
         vm.expectRevert("Only the owner can call this function");
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
     }
 
     function testCannotResubmitPendingToken() public {
@@ -850,7 +962,7 @@ contract TokenRegistryTest is Test {
 
         // Approve the token
         vm.prank(owner);
-        tokenRegistry.fastTrackToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Try to resubmit while approved
         vm.prank(nonOwner);

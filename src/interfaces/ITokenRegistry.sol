@@ -25,6 +25,13 @@ interface ITokenRegistry {
         uint256 editIndex;
     }
 
+    struct EditParams {
+        uint256 chainID;
+        uint256 initialIndex;
+        uint256 size;
+        uint256 totalEdits;
+    }
+
     event TokenAdded(
         address indexed contractAddress,
         string name,
@@ -42,7 +49,7 @@ interface ITokenRegistry {
         uint256 chainID
     );
     event TokenApproved(address indexed contractAddress, uint256 chainID);
-    event TokenRejected(address indexed contractAddress, uint256 chainID);
+    event TokenRejected(address indexed contractAddress, uint256 chainID, string reason);
     event TokenEditAccepted(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID);
     event TokentrollerUpdated(address indexed newCouncil);
     event TokenEditRejected(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID, string reason);
@@ -55,7 +62,7 @@ interface ITokenRegistry {
         uint8 _decimals,
         uint256 _chainID
     ) external;
-    function updateToken(
+    function proposeTokenEdit(
         address _contractAddress,
         string memory _name,
         string memory _symbol,
@@ -70,8 +77,8 @@ interface ITokenRegistry {
         uint256 _chainID,
         string calldata _reason
     ) external;
-    function fastTrackToken(uint256 _chainID, address _contractAddress) external;
-    function rejectToken(uint256 _chainID, address _contractAddress) external;
+    function approveToken(uint256 _chainID, address _contractAddress) external;
+    function rejectToken(uint256 _chainID, address _contractAddress, string calldata _reason) external;
     function updateTokentroller(address _newTokentroller) external;
     function addTokenWithMetadata(
         address _contractAddress,
