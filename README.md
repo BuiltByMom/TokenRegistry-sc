@@ -72,10 +72,15 @@ OR to deploy to anvil with preexisting multicall contract
 ./scripts/deploy-anvil.sh
 ```
 
-You can also upload some tokens into the registry from tokens.json file
+You can also upload some tokens into the registry from tokens.json file. This will approve every third token.
 
 ```bash
 ./scripts/upload-tokens.sh
+```
+
+Or upload tokens in batches, to avoid running out of gas
+```bash
+./scripts/upload-tokens-batch.sh 
 ```
 
 ### Register a Token
