@@ -377,7 +377,7 @@ contract TokenRegistry is ITokenRegistry {
         uint256 initialIndex,
         uint256 size,
         uint8 status
-    ) public view returns (Token[] memory tokens, uint256 finalIndex, bool hasMore) {
+    ) public view returns (Token[] memory tokens_, uint256 finalIndex, bool hasMore) {
         require(size > 0, "Size must be greater than zero");
         require(status <= 2, "Invalid status");
 
@@ -395,7 +395,7 @@ contract TokenRegistry is ITokenRegistry {
         // Calculate optimal array size
         uint256 remainingTokens = totalStatusTokens - initialIndex;
         uint256 arraySize = size > remainingTokens ? remainingTokens : size;
-        tokens = new Token[](arraySize);
+        tokens_ = new Token[](arraySize);
 
         uint256 found; // Number of tokens found for the requested status
         uint256 statusCount; // Running count of tokens matching the status
@@ -405,7 +405,7 @@ contract TokenRegistry is ITokenRegistry {
 
             if (exists) {
                 if (statusCount >= initialIndex) {
-                    tokens[found] = token;
+                    tokens_[found] = token;
                     found++;
                     finalIndex = i;
                 }
