@@ -49,6 +49,15 @@ forge test
 
 ### Deploy Contracts
 
+> Note: make sure you have a valid TOKEN_REGISTRY_ADDRESS, TOKENTROLLER_ADDRESS, RPC_URL, PRIVATE_KEY, and INITIAL_OWNER in your .env file
+```
+PRIVATE_KEY=
+INITIAL_OWNER=
+TOKEN_REGISTRY_ADDRESS=
+TOKENTROLLER_ADDRESS=
+RPC_URL=
+```
+
 ```bash
 # Deploy using script
 forge script script/TokenRegistry.s.sol:DeployTokenRegistry \
@@ -60,7 +69,13 @@ forge script script/TokenRegistry.s.sol:DeployTokenRegistry \
 OR to deploy to anvil with preexisting multicall contract
 
 ```bash
-./deploy-anvil.sh
+./scripts/deploy-anvil.sh
+```
+
+You can also upload some tokens into the registry from tokens.json file
+
+```bash
+./scripts/upload-tokens.sh
 ```
 
 ### Register a Token
