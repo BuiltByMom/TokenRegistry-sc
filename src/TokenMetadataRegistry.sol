@@ -40,9 +40,9 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Adds a new metadata field to the registry
-     * @param _name The name of the metadata field
-     * @param _isActive The status of the metadata field
-     * @param _updatedAt The timestamp of the last update
+     * @param name The name of the metadata field
+     * @param isActive The status of the metadata field
+     * @param updatedAt The timestamp of the last update
      * @notice Anyone can call this function to submit a new metadata field for consideration
      * @notice The metadata field is initially set to a pending status
      * @notice Emits a MetadataFieldAdded event upon successful addition
@@ -64,8 +64,8 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Allows to deprecate a metadata field
-     * @param _name The name of the metadata field
-     * @param _isActive The new status of the metadata field
+     * @param name The name of the metadata field
+     * @param isActive The new status of the metadata field
      * @notice Emits a MetadataFieldUpdated event upon successful update
      * @notice Requires the metadata field to exist and have a valid name
      * @notice Checks with the Tokentroller if the metadata field can be updated
@@ -81,10 +81,10 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Allows to set the metadata of a token
-     * @param _token The address of the token
-     * @param _chainID The chain ID of the token
-     * @param _field The name of the metadata field
-     * @param _value The value of the metadata field
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param field The name of the metadata field
+     * @param value The value of the metadata field
      * @notice Emits a MetadataValueSet event upon successful update
      * @notice Requires the metadata field to exist and have a valid name
      * @notice Checks with the Tokentroller if the metadata field can be updated
@@ -98,17 +98,19 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Allows to set the metadata of a token in batch
-     * @param _token The address of the token
-     * @param _chainID The chain ID of the token
-     * @param _metadata An array of MetadataInput structs
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param metadata An array of MetadataInput structs
      * @notice Emits a MetadataValueSet event upon successful update
      * @notice Requires the metadata field to exist and have a valid name
      * @notice Checks with the Tokentroller if the metadata field can be updated
      *********************************************************************************************/
     function setMetadataBatch(address token, uint256 chainID, MetadataInput[] calldata metadata) external {
-        require(ITokentroller(tokentroller).canSetMetadata(msg.sender, token, chainID, ""), "Not authorized");
-
         for (uint256 i = 0; i < metadata.length; i++) {
+            require(
+                ITokentroller(tokentroller).canSetMetadata(msg.sender, token, chainID, metadata[i].field),
+                "Not authorized"
+            );
             require(_isValidField(metadata[i].field), "Invalid field");
             tokenMetadata[chainID][token][metadata[i].field] = metadata[i].value;
             emit MetadataValueSet(token, chainID, metadata[i].field, metadata[i].value);
@@ -117,9 +119,9 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Allows to propose a metadata edit for a token
-     * @param _token The address of the token
-     * @param _chainID The chain ID of the token
-     * @param _updates An array of MetadataInput structs
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param updates An array of MetadataInput structs
      * @notice Emits a MetadataEditProposed event upon successful update
      * @notice Requires the metadata field to exist and have a valid name
      * @notice Checks with the Tokentroller if the metadata field can be updated
@@ -159,9 +161,9 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Allows to accept a metadata edit for a token
-     * @param _token The address of the token
-     * @param _chainID The chain ID of the token
-     * @param _editIndex The index of the edit proposal
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param editIndex The index of the edit proposal
      * @notice Emits a MetadataEditAccepted event upon successful update
      * @notice Requires the edit proposal to exist and have a valid index
      * @notice Checks with the Tokentroller if the edit proposal can be accepted
@@ -195,17 +197,17 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Allows to reject a metadata edit for a token
-     * @param _token The address of the token
-     * @param _chainID The chain ID of the token
-     * @param _editIndex The index of the edit proposal
-     * @param _reason The reason for rejecting the edit
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param editIndex The index of the edit proposal
+     * @param reason The reason for rejecting the edit
      * @notice Emits a MetadataEditRejected event upon successful update
      * @notice Requires the edit proposal to exist and have a valid index
      * @notice Checks with the Tokentroller if the edit proposal can be rejected
      *********************************************************************************************/
     function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex, string calldata reason) external {
         require(
-            ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, token, chainID, editIndex),
+            ITokentroller(tokentroller).canRejectMetadataEdit(msg.sender, token, chainID, editIndex),
             "Not authorized"
         );
         require(editIndex <= editCount[chainID][token], "Invalid edit index");
@@ -252,9 +254,9 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Retrieves the metadata of a token
-     * @param _token The address of the token
-     * @param _chainID The chain ID of the token
-     * @param _field The name of the metadata field
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param field The name of the metadata field
      * @return string memory The value of the metadata field
      *********************************************************************************************/
     function getMetadata(address token, uint256 chainID, string calldata field) external view returns (string memory) {
@@ -271,8 +273,8 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Retrieves all the metadata of a token
-     * @param _token The address of the token
-     * @param _chainID The chain ID of the token
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
      * @return MetadataValue[] memory The metadata values
      *********************************************************************************************/
     function getAllMetadata(address token, uint256 chainID) external view returns (MetadataValue[] memory) {
@@ -301,7 +303,7 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         uint256 chainID,
         uint256 initialIndex,
         uint256 size
-    ) external view returns (MetadataEditInfo[] memory edits_, uint256 finalIndex_, bool hasMore_) {
+    ) external view returns (MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) {
         require(size > 0, "Size must be greater than zero");
 
         // Count total edits
@@ -315,7 +317,7 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
         }
 
         uint256 arraySize = size > (totalEdits - initialIndex) ? (totalEdits - initialIndex) : size;
-        edits_ = new MetadataEditInfo[](arraySize);
+        edits = new MetadataEditInfo[](arraySize);
 
         EditParams memory params = EditParams({
             chainID: chainID,
@@ -324,7 +326,7 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
             totalEdits: totalEdits
         });
 
-        (finalIndex_, hasMore_) = _getEdits(edits_, params);
+        (finalIndex, hasMore) = _getEdits(edits, params);
     }
 
     /**********************************************************************************************
@@ -369,16 +371,16 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
     }
 
     /**********************************************************************************************
-     * @dev Internal function to get the metadata edits
+     * @dev Private function to get the metadata edits
      * @param edits The array of metadata edits
      * @param params The parameters for the edits
-     * @return finalIndex_ The index of the last edit
-     * @return hasMore_ True if there are more edits, false otherwise
+     * @return finalIndex The index of the last edit
+     * @return hasMore True if there are more edits, false otherwise
      *********************************************************************************************/
     function _getEdits(
         MetadataEditInfo[] memory edits,
         EditParams memory params
-    ) private view returns (uint256 finalIndex_, bool hasMore_) {
+    ) private view returns (uint256 finalIndex, bool hasMore) {
         uint256 found;
         uint256 editCounter;
 
@@ -399,25 +401,24 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
                             timestamp: proposal.timestamp
                         });
                         found++;
-                        finalIndex_ = editCounter;
+                        finalIndex = editCounter;
                     }
                 }
                 editCounter++;
             }
         }
 
-        hasMore_ = (params.totalEdits - params.initialIndex) > params.size;
+        hasMore = (params.totalEdits - params.initialIndex) > params.size;
     }
 
     /**********************************************************************************************
-     * @dev Internal function to check if a field is valid
+     * @dev Private function to check if a field is valid
      * @param field The name of the metadata field
      * @return bool True if the field is valid, false otherwise
      *********************************************************************************************/
-    function _isValidField(string memory field) internal view returns (bool) {
+    function _isValidField(string memory field) private view returns (bool) {
         uint256 index = fieldIndices[field];
         if (index == 0) return false;
-
         return metadataFields[index - 1].isActive;
     }
 
@@ -435,14 +436,14 @@ contract TokenMetadataRegistry is ITokenMetadataRegistry {
 
     /**********************************************************************************************
      * @dev Function to update the tokentroller address
-     * @param _newTokentroller The address of the new tokentroller
+     * @param newTokentroller The address of the new tokentroller
      * @notice This function can only be called by the tokentroller
      * @notice The new tokentroller address must be valid
      * @notice Emits a TokentrollerUpdated event upon successful update
      *********************************************************************************************/
-    function updateTokentroller(address _newTokentroller) public {
+    function updateTokentroller(address newTokentroller) public {
         require(msg.sender == tokentroller, "Only the tokentroller can call this function");
-        tokentroller = _newTokentroller;
-        emit TokentrollerUpdated(_newTokentroller);
+        tokentroller = newTokentroller;
+        emit TokentrollerUpdated(newTokentroller);
     }
 }

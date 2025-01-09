@@ -33,52 +33,46 @@ contract TokentrollerV1 is ITokentroller {
 
     /**********************************************************************************************
      * @dev Updates the tokentroller address in the TokenRegistry contract
-     * @param _newTokentroller The address of the new tokentroller
+     * @param newTokentroller The address of the new tokentroller
      * @notice This function can only be called by the owner
      * @notice The new tokentroller address must not be zero or the current contract address
      * @notice Calls the updateTokentroller function in the TokenRegistry contract
      *********************************************************************************************/
-    function updateRegistryTokentroller(address _newTokentroller) public {
+    function updateRegistryTokentroller(address newTokentroller) public {
         require(msg.sender == owner, "Only the owner can call this function");
-        require(_newTokentroller != address(0), "New tokentroller address cannot be zero");
-        require(
-            _newTokentroller != address(this),
-            "New tokentroller address cannot be the same as the current address"
-        );
-        TokenRegistry(tokenRegistry).updateTokentroller(_newTokentroller);
+        require(newTokentroller != address(0), "New tokentroller address cannot be zero");
+        require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
+        TokenRegistry(tokenRegistry).updateTokentroller(newTokentroller);
     }
 
     /**********************************************************************************************
      * @dev Updates the tokentroller address in the TokenMetadataRegistry contract
-     * @param _newTokentroller The address of the new tokentroller
+     * @param newTokentroller The address of the new tokentroller
      * @notice This function can only be called by the owner
      * @notice The new tokentroller address must not be zero or the current contract address
      * @notice Calls the updateTokentroller function in the TokenRegistry contract
      *********************************************************************************************/
-    function updateMetadataRegistryTokentroller(address _newTokentroller) public {
+    function updateMetadataRegistryTokentroller(address newTokentroller) public {
         require(msg.sender == owner, "Only the owner can call this function");
-        require(_newTokentroller != address(0), "New tokentroller address cannot be zero");
-        require(
-            _newTokentroller != address(this),
-            "New tokentroller address cannot be the same as the current address"
-        );
-        TokenMetadataRegistry(metadataRegistry).updateTokentroller(_newTokentroller);
+        require(newTokentroller != address(0), "New tokentroller address cannot be zero");
+        require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
+        TokenMetadataRegistry(metadataRegistry).updateTokentroller(newTokentroller);
     }
 
     /**********************************************************************************************
      * @dev Updates the owner of the Tokentroller contract
-     * @param _newOwner The address of the new owner
+     * @param newOwner The address of the new owner
      * @notice This function can only be called by the current owner
      * @notice The new owner address must not be zero
      * @notice Emits an OwnerUpdated event upon successful update
      *********************************************************************************************/
-    function updateOwner(address _newOwner) public {
+    function updateOwner(address newOwner) public {
         require(msg.sender == owner, "Only the owner can call this function");
-        require(_newOwner != address(0), "New owner address cannot be zero");
-        require(_newOwner != owner, "New owner must be different from current owner");
+        require(newOwner != address(0), "New owner address cannot be zero");
+        require(newOwner != owner, "New owner must be different from current owner");
         address oldOwner = owner;
-        owner = _newOwner;
-        emit OwnerUpdated(oldOwner, _newOwner);
+        owner = newOwner;
+        emit OwnerUpdated(oldOwner, newOwner);
     }
 
     /**********************************************************************************************
@@ -96,75 +90,129 @@ contract TokentrollerV1 is ITokentroller {
 
     /**********************************************************************************************
      * @dev Checks if a token can be approved
-     * @param _contractAddress The address of the token to potentially approve
+     * @param sender The address of the sender
+     * @param contractAddress The address of the token to potentially approve
+     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing approval
      * @return bool Returns true if the token can be approved, false otherwise
      *********************************************************************************************/
-    function canApproveToken(address _sender, address _contractAddress, uint256 _chainID) public view returns (bool) {
-        require(_sender == owner, "Only the owner can call this function");
+    function canApproveToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+        require(sender == owner, "Only the owner can call this function");
         return true;
     }
 
     /**********************************************************************************************
      * @dev Checks if a token can be rejected
-     * @param _contractAddress The address of the token to potentially reject
+     * @param sender The address of the sender
+     * @param contractAddress The address of the token to potentially reject
+     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing rejection
      * @return bool Returns true if the token can be rejected, false otherwise
      *********************************************************************************************/
-    function canRejectToken(address _sender, address _contractAddress, uint256 _chainID) public view returns (bool) {
-        require(_sender == owner, "Only the owner can call this function");
+    function canRejectToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+        require(sender == owner, "Only the owner can call this function");
         return true;
     }
 
     /**********************************************************************************************
      * @dev Checks if a new token can be added to the registry
-     * @param _contractAddress The address of the new token to be added
+     * @param contractAddress The address of the new token to be added
+     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canAddToken(address _contractAddress, uint256 _chainID) public view returns (bool) {
+    function canAddToken(address contractAddress, uint256 chainID) public view returns (bool) {
         return true;
     }
 
     /**********************************************************************************************
      * @dev Checks if a token in the registry can be updated
-     * @param _contractAddress The address of the token to update
+     * @param contractAddress The address of the token to update
+     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token updates
      * @return bool Returns true if the token can be updated, false otherwise
      *********************************************************************************************/
-    function canProposeTokenEdit(address _contractAddress, uint256 _chainID) public view returns (bool) {
+    function canProposeTokenEdit(address contractAddress, uint256 chainID) public view returns (bool) {
         return true;
     }
 
     /**********************************************************************************************
      * @dev Checks if a token edit can be accepted
-     * @param _contractAddress The address of the token for which the edit is proposed
-     * @param _editIndex The index of the edit to be accepted
+     * @param sender The address of the sender
+     * @param contractAddress The address of the token for which the edit is proposed
+     * @param chainID The chain ID of the token
+     * @param editIndex The index of the edit to be accepted
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing edit acceptance
      * @return bool Returns true if the edit can be accepted, false otherwise
      *********************************************************************************************/
     function canAcceptTokenEdit(
-        address _contractAddress,
-        uint256 _chainID,
-        uint256 _editIndex
+        address sender,
+        address contractAddress,
+        uint256 chainID,
+        uint256 editIndex
     ) public view returns (bool) {
-        return true;
+        return sender == owner;
     }
 
+    /**********************************************************************************************
+     * @dev Checks if a token edit can be rejected
+     * @param sender The address of the sender
+     * @param contractAddress The address of the token for which the edit is proposed
+     * @param chainID The chain ID of the token
+     * @param editIndex The index of the edit to be rejected
+     * @notice This function is called by the TokenRegistry contract
+     * @notice It should implement any necessary checks before allowing edit rejection
+     * @return bool Returns true if the edit can be rejected, false otherwise
+     *********************************************************************************************/
+    function canRejectTokenEdit(
+        address sender,
+        address contractAddress,
+        uint256 chainID,
+        uint256 editIndex
+    ) external view returns (bool) {
+        return sender == owner;
+    }
+
+    /**********************************************************************************************
+     * @dev Checks if a metadata field can be added
+     * @param sender The address of the sender
+     * @param name The name of the metadata field
+     * @notice This function is called by the TokenRegistry contract
+     * @notice It should implement any necessary checks before allowing metadata field addition
+     * @return bool Returns true if the metadata field can be added, false otherwise
+     *********************************************************************************************/
     function canAddMetadataField(address sender, string calldata name) external view returns (bool) {
         return sender == owner;
     }
 
+    /**********************************************************************************************
+     * @dev Checks if a metadata field can be updated
+     * @param _sender The address of the sender
+     * @param name The name of the metadata field
+     * @param isActive The status of the metadata field
+     * @notice This function is called by the TokenRegistry contract
+     * @notice It should implement any necessary checks before allowing metadata field updates
+     * @return bool Returns true if the metadata field can be updated, false otherwise
+     *********************************************************************************************/
     function canUpdateMetadataField(address sender, string calldata name, bool isActive) external view returns (bool) {
         return sender == owner;
     }
 
-    // FIXME: check if method is safe
+    /**********************************************************************************************
+     * @dev Checks if a metadata field can be set
+     * @param sender The address of the sender
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param field The name of the metadata field
+     * @notice This function is called by the TokenRegistry contract
+     * @notice It should implement any necessary checks before allowing metadata field updates
+     * @return bool Returns true if the metadata field can be updated, false otherwise
+     *********************************************************************************************/
     function canSetMetadata(
         address sender,
         address token,
@@ -187,6 +235,16 @@ contract TokentrollerV1 is ITokentroller {
         return submitter == address(0);
     }
 
+    /**********************************************************************************************
+     * @dev Checks if a metadata edit can be proposed
+     * @param sender The address of the sender
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param updates The array of MetadataInput structs
+     * @notice This function is called by the TokenMetadataRegistry contract
+     * @notice This function verifies that the token is approved
+     * @return bool Returns true if the metadata edit can be proposed, false otherwise
+     *********************************************************************************************/
     function canProposeMetadataEdit(
         address sender,
         address token,
@@ -199,6 +257,16 @@ contract TokentrollerV1 is ITokentroller {
         return contractAddress != address(0);
     }
 
+    /**********************************************************************************************
+     * @dev Checks if a metadata edit can be accepted
+     * @param sender The address of the sender
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param editIndex The index of the edit to be accepted
+     * @notice This function is called by the TokenMetadataRegistry contract
+     * @notice This function verifies that the sender is the owner
+     * @return bool Returns true if the metadata edit can be accepted, false otherwise
+     *********************************************************************************************/
     function canAcceptMetadataEdit(
         address sender,
         address token,
@@ -208,7 +276,17 @@ contract TokentrollerV1 is ITokentroller {
         return sender == owner;
     }
 
-    function canRejectTokenEdit(
+    /**********************************************************************************************
+     * @dev Checks if a metadata edit can be rejected
+     * @param sender The address of the sender
+     * @param token The address of the token
+     * @param chainID The chain ID of the token
+     * @param editIndex The index of the edit to be rejected
+     * @notice This function is called by the TokenMetadataRegistry contract
+     * @notice This function verifies that the sender is the owner
+     * @return bool Returns true if the metadata edit can be rejected, false otherwise
+     *********************************************************************************************/
+    function canRejectMetadataEdit(
         address sender,
         address token,
         uint256 chainID,

@@ -17,7 +17,7 @@ contract TokenRegistryTest is Test {
     address tokenAddress = address(4);
     uint256 chainID = 1;
 
-    event TokenRejected(address indexed contractAddress, uint256 chainID, string reason);
+    event TokenRejected(address indexed contractAddress, uint256 indexed chainID, string reason);
 
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
@@ -146,7 +146,7 @@ contract TokenRegistryTest is Test {
         tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
 
         string memory reason = "Token does not meet listing criteria";
-        vm.expectEmit(true, false, false, true);
+        vm.expectEmit(true, true, false, true);
         emit TokenRejected(tokenAddress, chainID, reason);
 
         vm.prank(owner);

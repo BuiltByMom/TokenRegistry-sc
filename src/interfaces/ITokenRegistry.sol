@@ -48,66 +48,71 @@ interface ITokenRegistry {
         uint8 decimals,
         uint256 chainID
     );
-    event TokenApproved(address indexed contractAddress, uint256 chainID);
-    event TokenRejected(address indexed contractAddress, uint256 chainID, string reason);
-    event TokenEditAccepted(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID);
+    event TokenApproved(address indexed contractAddress, uint256 indexed chainID);
+    event TokenRejected(address indexed contractAddress, uint256 indexed chainID, string reason);
+    event TokenEditAccepted(address indexed contractAddress, uint256 indexed editIndex, uint256 indexed chainID);
+    event TokenEditRejected(
+        address indexed contractAddress,
+        uint256 indexed editIndex,
+        uint256 indexed chainID,
+        string reason
+    );
     event TokentrollerUpdated(address indexed newCouncil);
-    event TokenEditRejected(address indexed contractAddress, uint256 indexed editIndex, uint256 chainID, string reason);
 
     function addToken(
-        address _contractAddress,
-        string memory _name,
-        string memory _symbol,
-        string memory _logoURI,
-        uint8 _decimals,
-        uint256 _chainID
+        address contractAddress,
+        string memory name,
+        string memory symbol,
+        string memory logoURI,
+        uint8 decimals,
+        uint256 chainID
     ) external;
     function proposeTokenEdit(
-        address _contractAddress,
-        string memory _name,
-        string memory _symbol,
-        string memory _logoURI,
-        uint8 _decimals,
-        uint256 _chainID
+        address contractAddress,
+        string memory name,
+        string memory symbol,
+        string memory logoURI,
+        uint8 decimals,
+        uint256 chainID
     ) external;
-    function acceptTokenEdit(address _contractAddress, uint256 _editIndex, uint256 _chainID) external;
+    function acceptTokenEdit(address contractAddress, uint256 editIndex, uint256 chainID) external;
     function rejectTokenEdit(
-        address _contractAddress,
-        uint256 _editIndex,
-        uint256 _chainID,
-        string calldata _reason
+        address contractAddress,
+        uint256 editIndex,
+        uint256 chainID,
+        string calldata reason
     ) external;
-    function approveToken(uint256 _chainID, address _contractAddress) external;
-    function rejectToken(uint256 _chainID, address _contractAddress, string calldata _reason) external;
-    function updateTokentroller(address _newTokentroller) external;
+    function approveToken(uint256 chainID, address contractAddress) external;
+    function rejectToken(uint256 chainID, address contractAddress, string calldata reason) external;
+    function updateTokentroller(address newTokentroller) external;
     function addTokenWithMetadata(
-        address _contractAddress,
-        string memory _name,
-        string memory _symbol,
-        string memory _logoURI,
-        uint8 _decimals,
-        uint256 _chainID,
+        address contractAddress,
+        string memory name,
+        string memory symbol,
+        string memory logoURI,
+        uint8 decimals,
+        uint256 chainID,
         MetadataInput[] calldata metadata
     ) external;
     function proposeTokenAndMetadataEdit(
-        address _contractAddress,
-        string memory _name,
-        string memory _symbol,
-        string memory _logoURI,
-        uint8 _decimals,
-        uint256 _chainID,
+        address contractAddress,
+        string memory name,
+        string memory symbol,
+        string memory logoURI,
+        uint8 decimals,
+        uint256 chainID,
         MetadataInput[] calldata metadataUpdates
     ) external;
 
     function tokenCount(uint256 _chainID) external view returns (uint256);
     function getTokenCounts(
-        uint256 _chainID
+        uint256 chainID
     ) external view returns (uint256 pending, uint256 approved, uint256 rejected);
     function listAllEdits(
-        uint256 _chainID,
-        uint256 _initialIndex,
-        uint256 _size
-    ) external view returns (TokenEdit[] memory edits_, uint256 finalIndex_, bool hasMore_);
-    function tokensWithEditsLength(uint256 _chainID) external view returns (uint256);
-    function getTokensWithEdits(uint256 _chainID, uint256 _index) external view returns (address);
+        uint256 chainID,
+        uint256 initialIndex,
+        uint256 size
+    ) external view returns (TokenEdit[] memory edits, uint256 finalIndex, bool hasMore);
+    function tokensWithEditsLength(uint256 chainID) external view returns (uint256);
+    function getTokensWithEdits(uint256 chainID, uint256 index) external view returns (address);
 }

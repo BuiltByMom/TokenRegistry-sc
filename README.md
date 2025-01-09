@@ -60,7 +60,7 @@ forge script script/TokenRegistry.s.sol:DeployTokenRegistry \
 OR to deploy to anvil with preexisting multicall contract
 
 ```bash
-./deploy.sh
+./deploy-anvil.sh
 ```
 
 ### Register a Token
@@ -71,7 +71,7 @@ tokenRegistry.addToken(
     tokenAddress,
     "Token Name",
     "TKN",
-    "https://token-logo.png",
+    "ipfs://QmREhgt4Q1xEWMqM1RAB85UpXai6ekWrj33cYrV7qCoaWP",
     18,
     chainID
 );
@@ -85,7 +85,7 @@ tokenRegistry.proposeTokenEdit(
     tokenAddress,
     "New Token Name",
     "NTKN",
-    "https://new-token-logo.png",
+    "ipfs://QmREhgt4Q1xEWMqM1RAB85UpXai6ekWrj33cYrV7qCoaWP",
     18,
     chainID
 );
