@@ -1,66 +1,124 @@
-## Foundry
+# TokenRegistry
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+A decentralized token registry system built on Ethereum that allows for the registration, verification, and management of tokens across multiple chains.
 
-Foundry consists of:
+## Overview
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+TokenRegistry is a smart contract system that provides:
 
-## Documentation
+- Token submission and verification
+- Multi-chain token management 
+- Decentralized governance through a Tokentroller
+- Token metadata management
+- Edit proposal and approval system
 
-https://book.getfoundry.sh/
+## Architecture
+
+The system consists of three main contracts:
+
+- **TokenRegistry**: Core contract for managing token registrations and edits
+- **TokenMetadataRegistry**: Handles additional metadata for registered tokens
+- **TokentrollerV1**: Governance contract that controls access and permissions
+
+## Features
+
+- Submit tokens for registration
+- Manage token approvals
+- Propose and approve token edits
+- Manage token metadata
+- Multi-chain support
+- Permissioned governance
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/builtbymom/TokenRegistry.git
+
+# Install dependencies
+forge install
+
+# Build
+forge build
+
+# Run tests
+forge test
+```
 
 ## Usage
 
-### Build
+### Deploy Contracts
 
-```shell
-$ forge build
+> Note: make sure you have a valid TOKEN_REGISTRY_ADDRESS, TOKENTROLLER_ADDRESS, RPC_URL, PRIVATE_KEY, and INITIAL_OWNER in your .env file
+```
+PRIVATE_KEY=
+INITIAL_OWNER=
+TOKEN_REGISTRY_ADDRESS=
+TOKENTROLLER_ADDRESS=
+RPC_URL=
 ```
 
-### Test
-
-```shell
-$ forge test
+```bash
+# Deploy using script
+forge script script/TokenRegistry.s.sol:DeployTokenRegistry \
+--rpc-url <your_rpc_url> \
+--private-key <your_private_key> \
+--broadcast
 ```
 
-### Format
+OR to deploy to anvil with preexisting multicall contract
 
-```shell
-$ forge fmt
+```bash
+./scripts/deploy-anvil.sh
 ```
 
-### Gas Snapshots
+You can also upload some tokens into the registry from tokens.json file. This will approve every third token.
 
-```shell
-$ forge snapshot
+```bash
+./scripts/upload-tokens.sh
 ```
 
-### Anvil
-
-```shell
-$ anvil
+Or upload tokens in batches, to avoid running out of gas
+```bash
+./scripts/upload-tokens-batch.sh 
 ```
 
-### Deploy
+### Register a Token
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```solidity
+// Submit a token for registration
+tokenRegistry.addToken(
+    tokenAddress,
+    "Token Name",
+    "TKN",
+    "ipfs://QmREhgt4Q1xEWMqM1RAB85UpXai6ekWrj33cYrV7qCoaWP",
+    18,
+    chainID
+);
 ```
 
-### Cast
+### Propose Token Edit
 
-```shell
-$ cast <subcommand>
+```solidity
+// Propose an edit to an existing token
+tokenRegistry.proposeTokenEdit(
+    tokenAddress,
+    "New Token Name",
+    "NTKN",
+    "ipfs://QmREhgt4Q1xEWMqM1RAB85UpXai6ekWrj33cYrV7qCoaWP",
+    18,
+    chainID
+);
 ```
 
-### Help
+## Testing
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+The project includes a comprehensive test suite:
+
+```bash
+# Run all tests
+forge test
+
+# Run tests with verbosity
+forge test -vvv
 ```
