@@ -7,8 +7,9 @@ interface ITokentroller {
 
     function canApproveToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
     function canRejectToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
-    function canAddToken(address contractAddress, uint256 chainID) external view returns (bool);
-    function canProposeTokenEdit(address contractAddress, uint256 chainID) external view returns (bool);
+    function canAddToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
+    function canUpdateToken(address sender, address contractAddress, uint256 chainID) external view returns (bool);
+    function canProposeTokenEdit(address sender, address contractAddress, uint256 chainID) external view returns (bool);
     function canAcceptTokenEdit(
         address sender,
         address contractAddress,
@@ -32,7 +33,7 @@ interface ITokentroller {
     ) external view returns (bool);
 
     function canProposeMetadataEdit(
-        address user,
+        address sender,
         address token,
         uint256 chainID,
         MetadataInput[] calldata updates

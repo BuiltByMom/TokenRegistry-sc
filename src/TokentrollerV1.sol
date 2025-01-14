@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
 import "./interfaces/ITokentroller.sol";
 import "./TokenRegistry.sol";
 import "./TokenMetadataRegistry.sol";
-
+import "./TokenRegistryEdits.sol";
 contract TokentrollerV1 is ITokentroller {
     address public tokenRegistry;
+    address public tokenRegistryEdits;
     address public metadataRegistry;
     address public owner;
 
@@ -18,6 +18,7 @@ contract TokentrollerV1 is ITokentroller {
         owner = _owner;
         metadataRegistry = address(new TokenMetadataRegistry(address(this)));
         tokenRegistry = address(new TokenRegistry(address(this), metadataRegistry));
+        tokenRegistryEdits = address(new TokenRegistryEdits(tokenRegistry, metadataRegistry));
     }
 
     /**********************************************************************************************
@@ -43,6 +44,7 @@ contract TokentrollerV1 is ITokentroller {
         require(newTokentroller != address(0), "New tokentroller address cannot be zero");
         require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
         TokenRegistry(tokenRegistry).updateTokentroller(newTokentroller);
+        TokenRegistryEdits(tokenRegistryEdits).updateTokentroller(newTokentroller);
     }
 
     /**********************************************************************************************
@@ -118,25 +120,42 @@ contract TokentrollerV1 is ITokentroller {
 
     /**********************************************************************************************
      * @dev Checks if a new token can be added to the registry
+     * @param sender The address of the sender
      * @param contractAddress The address of the new token to be added
      * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canAddToken(address contractAddress, uint256 chainID) public view returns (bool) {
+    function canAddToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
         return true;
     }
 
     /**********************************************************************************************
+     * @dev Checks if a new token can be added to the registry
+     * @param sender The address of the sender
+     * @param contractAddress The address of the new token to be added
+     * @param chainID The chain ID of the token
+     * @notice This function is called by the TokenRegistry contract
+     * @notice It should implement any necessary checks before allowing token addition
+     * @return bool Returns true if the token can be added, false otherwise
+     *********************************************************************************************/
+    function canUpdateToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+        console.log("sender", sender);
+        console.log("tokenRegistryEdits", tokenRegistryEdits);
+        return sender == tokenRegistryEdits;
+    }
+
+    /**********************************************************************************************
      * @dev Checks if a token in the registry can be updated
+     * @param sender The address of the sender
      * @param contractAddress The address of the token to update
      * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token updates
      * @return bool Returns true if the token can be updated, false otherwise
      *********************************************************************************************/
-    function canProposeTokenEdit(address contractAddress, uint256 chainID) public view returns (bool) {
+    function canProposeTokenEdit(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
         return true;
     }
 

@@ -67,7 +67,7 @@ contract TokenMetadataRegistryTest is Test {
     function testSetMetadata() public {
         // First add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // First add the field
         vm.prank(owner);
@@ -84,7 +84,7 @@ contract TokenMetadataRegistryTest is Test {
     function testCannotSetInvalidField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(nonOwner);
         vm.expectRevert("Invalid field");
@@ -94,7 +94,7 @@ contract TokenMetadataRegistryTest is Test {
     function testCannotSetInactiveField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // Add and then deactivate the field
         vm.prank(owner);
@@ -125,7 +125,7 @@ contract TokenMetadataRegistryTest is Test {
     function testGetAllMetadata() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // First add the fields
         vm.prank(owner);
@@ -161,7 +161,7 @@ contract TokenMetadataRegistryTest is Test {
     function testGetAllMetadataWithInactiveField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // Add and set fields
         vm.prank(owner);
@@ -198,7 +198,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Then add token and set metadata
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(nonOwner);
         metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
@@ -214,7 +214,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
 
@@ -233,9 +233,9 @@ contract TokenMetadataRegistryTest is Test {
 
         // Add same token address on different chains
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token Chain 1", "TEST1", "logo1", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token Chain 1", "TEST1", "logo1", 18);
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token Chain 2", "TEST2", "logo2", 18, chainID2);
+        tokenRegistry.addToken(chainID2, tokenAddress, "Test Token Chain 2", "TEST2", "logo2", 18);
 
         // Set different metadata for each chain
         vm.prank(nonOwner);
@@ -257,7 +257,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Add token and set metadata
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(nonOwner);
         metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
@@ -286,7 +286,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Add token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // Prepare batch metadata
         MetadataInput[] memory inputs = new MetadataInput[](2);
@@ -307,7 +307,7 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("website");
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
@@ -345,7 +345,7 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("website");
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
@@ -378,7 +378,7 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("twitter");
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
@@ -409,7 +409,7 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("website");
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
@@ -441,7 +441,7 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("twitter");
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
@@ -484,12 +484,12 @@ contract TokenMetadataRegistryTest is Test {
         address token2 = address(2);
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token 2", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token 2", "TEST", "logo", 18);
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(token2, "Test Token 2", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, token2, "Test Token 2", "TEST", "logo", 18);
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, token2);
 
@@ -527,7 +527,7 @@ contract TokenMetadataRegistryTest is Test {
 
     function testInvalidFieldRejection() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token 2", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token 2", "TEST", "logo", 18);
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
 
@@ -541,7 +541,7 @@ contract TokenMetadataRegistryTest is Test {
 
     function testEmptyUpdatesRejection() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token 2", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(chainID, tokenAddress, "Test Token 2", "TEST", "logo", 18);
         vm.prank(owner);
         tokenRegistry.approveToken(chainID, tokenAddress);
 
