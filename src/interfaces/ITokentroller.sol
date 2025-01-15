@@ -32,6 +32,8 @@ interface ITokentroller {
         string calldata field
     ) external view returns (bool);
 
+    function canUpdateMetadata(address sender, address token, uint256 chainID) external view returns (bool);
+
     function canProposeMetadataEdit(
         address sender,
         address token,

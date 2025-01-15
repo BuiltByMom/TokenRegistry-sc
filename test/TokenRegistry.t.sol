@@ -10,7 +10,6 @@ import "src/interfaces/ITokenRegistry.sol";
 contract TokenRegistryTest is Test {
     TokenRegistry tokenRegistry;
     TokentrollerV1 tokentroller;
-    TokenMetadataRegistry metadataRegistry;
     address owner = address(1);
     address nonOwner = address(2);
     address nonOwner2 = address(3);
@@ -22,7 +21,6 @@ contract TokenRegistryTest is Test {
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
         tokenRegistry = TokenRegistry(tokentroller.tokenRegistry());
-        metadataRegistry = TokenMetadataRegistry(tokentroller.metadataRegistry());
     }
 
     function testAddToken() public {
@@ -394,53 +392,6 @@ contract TokenRegistryTest is Test {
         assertEq(rejectedTokens.length, 3);
         assertEq(rejectedTokens[0].name, "Token 1");
         assertEq(rejectedTokens[2].name, "Token 7");
-    }
-
-    function testAddTokenWithMetadata() public {
-        // Add fields first
-        vm.startPrank(owner);
-        metadataRegistry.addMetadataField("website");
-        metadataRegistry.addMetadataField("twitter");
-        vm.stopPrank();
-
-        // Prepare metadata inputs
-        MetadataInput[] memory metadata = new MetadataInput[](2);
-        metadata[0] = MetadataInput({ field: "website", value: "https://example.com" });
-        metadata[1] = MetadataInput({ field: "twitter", value: "@example" });
-
-        // Add token with metadata
-        vm.prank(nonOwner);
-        tokenRegistry.addTokenWithMetadata(
-            chainID,
-            tokenAddress,
-            "Test Token",
-            "TEST",
-            "https://logo.com",
-            18,
-            metadata
-        );
-
-        // Verify metadata was set
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "website"), "https://example.com");
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "twitter"), "@example");
-    }
-
-    function testCannotAddTokenWithInvalidMetadataField() public {
-        // Prepare metadata inputs with invalid field
-        MetadataInput[] memory metadata = new MetadataInput[](1);
-        metadata[0] = MetadataInput({ field: "invalid_field", value: "some value" });
-
-        vm.prank(nonOwner);
-        vm.expectRevert("Invalid field");
-        tokenRegistry.addTokenWithMetadata(
-            chainID,
-            tokenAddress,
-            "Test Token",
-            "TEST",
-            "https://logo.com",
-            18,
-            metadata
-        );
     }
 
     function testResubmitRejectedToken() public {

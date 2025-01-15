@@ -12,7 +12,6 @@ contract TokenEditsTest is Test {
     TokenEdits tokenEdits;
     TokenRegistry tokenRegistry;
     TokentrollerV1 tokentroller;
-    TokenMetadataRegistry metadataRegistry;
     address owner = address(1);
     address nonOwner = address(2);
     address nonOwner2 = address(3);
@@ -26,7 +25,6 @@ contract TokenEditsTest is Test {
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
         tokenRegistry = TokenRegistry(tokentroller.tokenRegistry());
-        metadataRegistry = TokenMetadataRegistry(tokentroller.metadataRegistry());
         tokenEdits = TokenEdits(tokentroller.tokenEdits());
     }
 
@@ -225,41 +223,5 @@ contract TokenEditsTest is Test {
         assertEq(edits.length, 1);
         assertEq(edits[0].name, "Updated Token 2");
         assertFalse(hasMore);
-    }
-
-    function testProposeEditWithMetadata() public {
-        // Add and approve token first
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Setup metadata field
-        vm.prank(owner);
-        metadataRegistry.addMetadataField("website");
-
-        // Prepare metadata updates
-        MetadataInput[] memory updates = new MetadataInput[](1);
-        updates[0] = MetadataInput({ field: "website", value: "https://example.com" });
-
-        // Propose both edits
-        vm.prank(nonOwner);
-        tokenEdits.proposeEditWithMetadata(tokenAddress, "Updated Token", "UTEST", "newlogo", 18, chainID, updates);
-
-        // Verify token edit was proposed
-        (TokenEdits.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenEdits.listEdits(chainID, 0, 1);
-        TokenEdits.TokenEdit memory tokenEdit = edits[0];
-        assertEq(tokenEdit.name, "Updated Token");
-        assertEq(tokenEdit.symbol, "UTEST");
-
-        // Verify metadata edit was proposed
-        (
-            TokenMetadataRegistry.MetadataEditInfo[] memory metadataEdits,
-            uint256 metadataFinalIndex,
-            bool metadataHasMore
-        ) = metadataRegistry.listAllEdits(chainID, 0, 1);
-
-        assertEq(metadataEdits.length, 1);
-        assertEq(metadataEdits[0].updates[0].value, "https://example.com");
     }
 }

@@ -10,23 +10,6 @@ interface ITokenMetadataRegistry {
         uint256 size;
         uint256 totalEdits;
     }
-
-    struct MetadataEditProposal {
-        address submitter;
-        MetadataInput[] updates;
-        uint256 chainID;
-        uint256 timestamp;
-    }
-
-    struct MetadataEditInfo {
-        address token;
-        address submitter;
-        MetadataInput[] updates;
-        uint256 chainID;
-        uint256 editIndex;
-        uint256 timestamp;
-    }
-
     struct MetadataField {
         string name;
         bool isActive;
@@ -37,13 +20,6 @@ interface ITokenMetadataRegistry {
         string field;
         string value;
         bool isActive;
-    }
-
-    struct EditProposalDetails {
-        address submitter;
-        MetadataInput[] updates;
-        uint256 chainID;
-        uint256 timestamp;
     }
 
     event MetadataFieldAdded(string name);
@@ -68,14 +44,6 @@ interface ITokenMetadataRegistry {
     function getMetadata(address token, uint256 chainID, string calldata field) external view returns (string memory);
     function getMetadataFields() external view returns (MetadataField[] memory);
     function getAllMetadata(address token, uint256 chainID) external view returns (MetadataValue[] memory);
-    function proposeMetadataEdit(address token, uint256 chainID, MetadataInput[] calldata updates) external;
-    function acceptMetadataEdit(address token, uint256 chainID, uint256 editIndex) external;
-    function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex, string calldata reason) external;
-    function getEditProposal(
-        uint256 chainID,
-        address token,
-        uint256 editIndex
-    ) external view returns (EditProposalDetails memory);
-    function tokensMetadataWithEditsLength(uint256 chainID) external view returns (uint256);
-    function getTokensMetadataWithEdits(uint256 chainID, uint256 index) external view returns (address);
+    function isValidField(string memory field) external view returns (bool);
+    function updateMetadata(address token, uint256 chainID, MetadataInput[] calldata metadata) external;
 }

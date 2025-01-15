@@ -4,10 +4,13 @@ import "./interfaces/ITokentroller.sol";
 import "./TokenRegistry.sol";
 import "./TokenMetadataRegistry.sol";
 import "./TokenEdits.sol";
+import "./TokenMetadataEdits.sol";
+
 contract TokentrollerV1 is ITokentroller {
     address public tokenRegistry;
     address public tokenEdits;
     address public metadataRegistry;
+    address public metadataEdits;
     address public owner;
 
     /**********************************************************************************************
@@ -18,7 +21,8 @@ contract TokentrollerV1 is ITokentroller {
         owner = _owner;
         metadataRegistry = address(new TokenMetadataRegistry(address(this)));
         tokenRegistry = address(new TokenRegistry(address(this), metadataRegistry));
-        tokenEdits = address(new TokenEdits(tokenRegistry, metadataRegistry));
+        metadataEdits = address(new TokenMetadataEdits(address(this), metadataRegistry));
+        tokenEdits = address(new TokenEdits(tokenRegistry, metadataEdits));
     }
 
     /**********************************************************************************************
@@ -272,6 +276,19 @@ contract TokentrollerV1 is ITokentroller {
         TokenRegistry registry = TokenRegistry(tokenRegistry);
         (address contractAddress, , , , , , ) = registry.tokens(TokenStatus.APPROVED, chainID, token);
         return contractAddress != address(0);
+    }
+
+    /**********************************************************************************************
+     * @dev Checks if a metadata can be updated
+     * @param sender The address of the sender
+     * @param contractAddress The address of the new token to be added
+     * @param chainID The chain ID of the token
+     * @notice This function is called by the TokenRegistry contract
+     * @notice It should implement any necessary checks before allowing token addition
+     * @return bool Returns true if the token can be added, false otherwise
+     *********************************************************************************************/
+    function canUpdateMetadata(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+        return sender == metadataEdits;
     }
 
     /**********************************************************************************************

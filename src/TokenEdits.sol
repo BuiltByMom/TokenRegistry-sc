@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./TokenRegistry.sol";
 import "./interfaces/ITokentroller.sol";
-import "./interfaces/ITokenMetadataRegistry.sol";
+import "./interfaces/ITokenMetadataEdits.sol";
 import "./interfaces/ISharedTypes.sol";
 import "./interfaces/ITokenEdits.sol";
 
@@ -16,12 +16,12 @@ contract TokenEdits is ITokenEdits {
     // Governance
     address public tokenRegistry;
     address public tokentroller;
-    address public metadataRegistry;
+    address public metadataEdits;
 
-    constructor(address _tokenRegistry, address _metadataRegistry) {
+    constructor(address _tokenRegistry, address _metadataEdits) {
         tokenRegistry = _tokenRegistry;
         tokentroller = TokenRegistry(tokenRegistry).tokentroller();
-        metadataRegistry = _metadataRegistry;
+        metadataEdits = _metadataEdits;
     }
 
     function proposeEdit(
@@ -118,22 +118,6 @@ contract TokenEdits is ITokenEdits {
         }
 
         emit EditRejected(contractAddress, editIndex, chainID, reason);
-    }
-
-    function proposeEditWithMetadata(
-        address contractAddress,
-        string memory name,
-        string memory symbol,
-        string memory logoURI,
-        uint8 decimals,
-        uint256 chainID,
-        MetadataInput[] calldata metadataUpdates
-    ) external {
-        // First propose the token edit
-        proposeEdit(contractAddress, name, symbol, logoURI, decimals, chainID);
-
-        // Then propose the metadata edit
-        ITokenMetadataRegistry(metadataRegistry).proposeMetadataEdit(contractAddress, chainID, metadataUpdates);
     }
 
     function listEdits(

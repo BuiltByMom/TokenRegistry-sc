@@ -52,16 +52,6 @@ interface ITokenEdits {
 
     function rejectEdit(address contractAddress, uint256 editIndex, uint256 chainID, string calldata reason) external;
 
-    function proposeEditWithMetadata(
-        address contractAddress,
-        string memory name,
-        string memory symbol,
-        string memory logoURI,
-        uint8 decimals,
-        uint256 chainID,
-        MetadataInput[] calldata metadataUpdates
-    ) external;
-
     function listEdits(
         uint256 chainID,
         uint256 initialIndex,

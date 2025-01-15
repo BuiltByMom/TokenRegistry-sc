@@ -66,22 +66,6 @@ contract TokenRegistry is ITokenRegistry {
         emit TokenAdded(contractAddress, name, symbol, logoURI, decimals, chainID);
     }
 
-    function addTokenWithMetadata(
-        uint256 chainID,
-        address contractAddress,
-        string memory name,
-        string memory symbol,
-        string memory logoURI,
-        uint8 decimals,
-        MetadataInput[] calldata metadata
-    ) public {
-        // First add the token using existing logic
-        addToken(chainID, contractAddress, name, symbol, logoURI, decimals);
-
-        // Then set the metadata using the state variable
-        ITokenMetadataRegistry(metadataRegistry).setMetadataBatch(contractAddress, chainID, metadata);
-    }
-
     function approveToken(uint256 chainID, address contractAddress) public {
         require(
             tokens[TokenStatus.PENDING][chainID][contractAddress].contractAddress != address(0),
