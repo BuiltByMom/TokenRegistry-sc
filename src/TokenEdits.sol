@@ -5,9 +5,9 @@ import "./TokenRegistry.sol";
 import "./interfaces/ITokentroller.sol";
 import "./interfaces/ITokenMetadataRegistry.sol";
 import "./interfaces/ISharedTypes.sol";
-import "./interfaces/ITokenRegistryEdits.sol";
+import "./interfaces/ITokenEdits.sol";
 
-contract TokenRegistryEdits is ITokenRegistryEdits {
+contract TokenEdits is ITokenEdits {
     // Storage
     mapping(uint256 => mapping(address => mapping(uint256 => TokenEdit))) public editsOnTokens;
     mapping(uint256 => mapping(address => uint256)) public editCount;
@@ -38,7 +38,11 @@ contract TokenRegistryEdits is ITokenRegistryEdits {
         );
 
         // Verify token exists and is approved
-        (address tokenAddr, , , , , , ) = TokenRegistry(tokenRegistry).tokens(chainID, contractAddress, 1);
+        (address tokenAddr, , , , , , ) = TokenRegistry(tokenRegistry).tokens(
+            TokenStatus.APPROVED,
+            chainID,
+            contractAddress
+        );
         require(tokenAddr != address(0), "Token must be approved");
 
         uint256 newIndex = ++editCount[chainID][contractAddress];

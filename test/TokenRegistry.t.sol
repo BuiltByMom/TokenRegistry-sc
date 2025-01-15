@@ -37,7 +37,7 @@ contract TokenRegistryTest is Test {
             string memory symbol,
             uint8 decimals,
             uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 0);
+        ) = tokenRegistry.tokens(TokenStatus.PENDING, chainID, tokenAddress);
 
         assertEq(name, "Test Token");
         assertEq(symbol, "TTK");
@@ -61,7 +61,7 @@ contract TokenRegistryTest is Test {
             string memory symbol,
             uint8 decimals,
             uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 1);
+        ) = tokenRegistry.tokens(TokenStatus.APPROVED, chainID, tokenAddress);
         assertEq(name, "Test Token", "Token should be fast-tracked");
     }
 
@@ -84,7 +84,7 @@ contract TokenRegistryTest is Test {
             string memory symbol,
             uint8 decimals,
             uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 2);
+        ) = tokenRegistry.tokens(TokenStatus.REJECTED, chainID, tokenAddress);
         assertEq(name, "Test Token", "Token should be rejected");
     }
 
@@ -109,22 +109,22 @@ contract TokenRegistryTest is Test {
             );
         }
 
-        (TokenRegistry.Token[] memory tokens, uint256 finalIndex, bool hasMore) = tokenRegistry.listTokens(
+        (TokenRegistry.Token[] memory tokens, uint256 total) = tokenRegistry.listTokens(
             chainID,
             0,
             3,
-            0
+            TokenStatus.PENDING
         );
         assertEq(tokens.length, 3);
-        assertEq(finalIndex, 2);
-        assertTrue(hasMore);
+        assertEq(total, 5);
         assertEq(tokens[0].name, "Token 0");
         assertEq(tokens[2].name, "Token 2");
 
-        (tokens, finalIndex, hasMore) = tokenRegistry.listTokens(chainID, 3, 3, 0);
+        (tokens, total) = tokenRegistry.listTokens(chainID, 3, 3, TokenStatus.PENDING);
         assertEq(tokens.length, 2);
-        assertEq(finalIndex, 4);
-        assertFalse(hasMore);
+        assertEq(total, 5);
+        assertEq(tokens[0].name, "Token 3");
+        assertEq(tokens[1].name, "Token 4");
     }
 
     function testlistTokensWithDifferentStatuses() public {
@@ -145,12 +145,15 @@ contract TokenRegistryTest is Test {
             }
         }
 
-        (TokenRegistry.Token[] memory pendingTokens, uint256 pendingFinalIndex, bool hasMorePending) = tokenRegistry
-            .listTokens(chainID, 0, 10, 0);
+        (TokenRegistry.Token[] memory pendingTokens, ) = tokenRegistry.listTokens(chainID, 0, 10, TokenStatus.PENDING);
         assertEq(pendingTokens.length, 2);
 
-        (TokenRegistry.Token[] memory approvedTokens, uint256 approvedFinalIndex, bool hasMoreApproved) = tokenRegistry
-            .listTokens(chainID, 0, 10, 1);
+        (TokenRegistry.Token[] memory approvedTokens, ) = tokenRegistry.listTokens(
+            chainID,
+            0,
+            10,
+            TokenStatus.APPROVED
+        );
         assertEq(approvedTokens.length, 3);
 
         (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts(chainID);
@@ -307,25 +310,33 @@ contract TokenRegistryTest is Test {
         assertEq(rejected, 2, "Should have 2 rejected tokens (3,9)");
 
         // Test pending tokens pagination (should get tokens 1,5)
-        (TokenRegistry.Token[] memory pendingTokens, uint256 pendingFinalIndex, bool hasMorePending) = tokenRegistry
-            .listTokens(chainID, 0, 2, 0);
+        (TokenRegistry.Token[] memory pendingTokens, uint256 pendingTotal) = tokenRegistry.listTokens(
+            chainID,
+            0,
+            2,
+            TokenStatus.PENDING
+        );
         assertEq(pendingTokens.length, 2, "Should get 2 pending tokens");
         assertEq(pendingTokens[0].name, "Token 1", "First pending token should be Token 1");
         assertEq(pendingTokens[1].name, "Token 5", "Second pending token should be Token 5");
-        assertTrue(hasMorePending, "Should have one more pending token");
+        assertEq(pendingTotal, 3, "Should have 3 pending tokens");
 
         // Test rejected tokens pagination (should get tokens 3,9)
-        (TokenRegistry.Token[] memory rejectedTokens, uint256 rejectedFinalIndex, bool hasMoreRejected) = tokenRegistry
-            .listTokens(chainID, 0, 2, 2);
+        (TokenRegistry.Token[] memory rejectedTokens, uint256 rejectedTotal) = tokenRegistry.listTokens(
+            chainID,
+            0,
+            2,
+            TokenStatus.REJECTED
+        );
         assertEq(rejectedTokens.length, 2, "Should get 2 rejected tokens");
         assertEq(rejectedTokens[0].name, "Token 3", "First rejected token should be Token 3");
         assertEq(rejectedTokens[1].name, "Token 9", "Second rejected token should be Token 9");
-        assertFalse(hasMoreRejected, "Should not have more rejected tokens");
+        assertEq(rejectedTotal, 2, "Should have 2 rejected tokens");
 
         // Get full lists to verify counts
-        (TokenRegistry.Token[] memory allPending, , ) = tokenRegistry.listTokens(chainID, 0, 100, 0);
-        (TokenRegistry.Token[] memory allApproved, , ) = tokenRegistry.listTokens(chainID, 0, 100, 1);
-        (TokenRegistry.Token[] memory allRejected, , ) = tokenRegistry.listTokens(chainID, 0, 100, 2);
+        (TokenRegistry.Token[] memory allPending, ) = tokenRegistry.listTokens(chainID, 0, 100, TokenStatus.PENDING);
+        (TokenRegistry.Token[] memory allApproved, ) = tokenRegistry.listTokens(chainID, 0, 100, TokenStatus.APPROVED);
+        (TokenRegistry.Token[] memory allRejected, ) = tokenRegistry.listTokens(chainID, 0, 100, TokenStatus.REJECTED);
 
         assertEq(allPending.length, pending, "Full pending list length should match counter");
         assertEq(allApproved.length, approved, "Full approved list length should match counter");
@@ -358,18 +369,28 @@ contract TokenRegistryTest is Test {
         assertEq(approved, 4);
         assertEq(rejected, 3);
 
-        (TokenRegistry.Token[] memory pendingTokens, , ) = tokenRegistry.listTokens(chainID, 0, 10, 0);
+        (TokenRegistry.Token[] memory pendingTokens, ) = tokenRegistry.listTokens(chainID, 0, 10, TokenStatus.PENDING);
         assertEq(pendingTokens.length, 3);
         assertEq(pendingTokens[0].name, "Token 2");
         assertEq(pendingTokens[1].name, "Token 5");
         assertEq(pendingTokens[2].name, "Token 8");
 
-        (TokenRegistry.Token[] memory approvedTokens, , ) = tokenRegistry.listTokens(chainID, 0, 10, 1);
+        (TokenRegistry.Token[] memory approvedTokens, ) = tokenRegistry.listTokens(
+            chainID,
+            0,
+            10,
+            TokenStatus.APPROVED
+        );
         assertEq(approvedTokens.length, 4);
         assertEq(approvedTokens[0].name, "Token 0");
         assertEq(approvedTokens[3].name, "Token 9");
 
-        (TokenRegistry.Token[] memory rejectedTokens, , ) = tokenRegistry.listTokens(chainID, 0, 10, 2);
+        (TokenRegistry.Token[] memory rejectedTokens, ) = tokenRegistry.listTokens(
+            chainID,
+            0,
+            10,
+            TokenStatus.REJECTED
+        );
         assertEq(rejectedTokens.length, 3);
         assertEq(rejectedTokens[0].name, "Token 1");
         assertEq(rejectedTokens[2].name, "Token 7");
@@ -432,7 +453,7 @@ contract TokenRegistryTest is Test {
         tokenRegistry.rejectToken(chainID, tokenAddress, "Test reason");
 
         // Verify token is rejected
-        (address contractAddress, , , , , , ) = tokenRegistry.tokens(chainID, tokenAddress, 2); // status 2 = rejected
+        (address contractAddress, , , , , , ) = tokenRegistry.tokens(TokenStatus.REJECTED, chainID, tokenAddress);
         assertEq(contractAddress, tokenAddress);
         assertEq(tokenRegistry.rejectedTokenCount(chainID), 1);
         assertEq(tokenRegistry.pendingTokenCount(chainID), 0);
@@ -450,7 +471,7 @@ contract TokenRegistryTest is Test {
             string memory symbol,
             uint8 decimals,
             uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 0);
+        ) = tokenRegistry.tokens(TokenStatus.PENDING, chainID, tokenAddress);
         assertEq(contractAddressPending, tokenAddress);
         assertEq(name, "Test Token V2");
         assertEq(symbol, "TEST2");
@@ -458,7 +479,7 @@ contract TokenRegistryTest is Test {
         assertEq(tokenRegistry.rejectedTokenCount(chainID), 0);
 
         // Verify rejected state is cleared
-        (contractAddress, , , , , , ) = tokenRegistry.tokens(chainID, tokenAddress, 2);
+        (contractAddress, , , , , , ) = tokenRegistry.tokens(TokenStatus.REJECTED, chainID, tokenAddress);
         assertEq(contractAddress, address(0));
     }
 

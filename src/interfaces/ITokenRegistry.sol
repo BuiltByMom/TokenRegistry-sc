@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./ISharedTypes.sol";
 interface ITokenRegistry {
     struct Token {
         address contractAddress;
@@ -39,10 +40,10 @@ interface ITokenRegistry {
 
     function listTokens(
         uint256 chainID,
-        uint256 initialIndex,
-        uint256 size,
-        uint8 status
-    ) external view returns (Token[] memory tokens_, uint256 finalIndex, bool hasMore);
+        uint256 offset,
+        uint256 limit,
+        TokenStatus status
+    ) external view returns (Token[] memory tokens_, uint256 total);
 
     function tokenCount(uint256 _chainID) external view returns (uint256);
     function getTokenCounts(

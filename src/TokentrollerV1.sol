@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 import "./interfaces/ITokentroller.sol";
 import "./TokenRegistry.sol";
 import "./TokenMetadataRegistry.sol";
-import "./TokenRegistryEdits.sol";
+import "./TokenEdits.sol";
 contract TokentrollerV1 is ITokentroller {
     address public tokenRegistry;
-    address public tokenRegistryEdits;
+    address public tokenEdits;
     address public metadataRegistry;
     address public owner;
 
@@ -18,7 +18,7 @@ contract TokentrollerV1 is ITokentroller {
         owner = _owner;
         metadataRegistry = address(new TokenMetadataRegistry(address(this)));
         tokenRegistry = address(new TokenRegistry(address(this), metadataRegistry));
-        tokenRegistryEdits = address(new TokenRegistryEdits(tokenRegistry, metadataRegistry));
+        tokenEdits = address(new TokenEdits(tokenRegistry, metadataRegistry));
     }
 
     /**********************************************************************************************
@@ -44,7 +44,7 @@ contract TokentrollerV1 is ITokentroller {
         require(newTokentroller != address(0), "New tokentroller address cannot be zero");
         require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
         TokenRegistry(tokenRegistry).updateTokentroller(newTokentroller);
-        TokenRegistryEdits(tokenRegistryEdits).updateTokentroller(newTokentroller);
+        TokenEdits(tokenEdits).updateTokentroller(newTokentroller);
     }
 
     /**********************************************************************************************
@@ -141,9 +141,7 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
     function canUpdateToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
-        console.log("sender", sender);
-        console.log("tokenRegistryEdits", tokenRegistryEdits);
-        return sender == tokenRegistryEdits;
+        return sender == tokenEdits;
     }
 
     /**********************************************************************************************
@@ -240,11 +238,11 @@ contract TokentrollerV1 is ITokentroller {
     ) external view returns (bool) {
         TokenRegistry registry = TokenRegistry(tokenRegistry);
         // Check pending tokens first
-        (address contractAddress, address submitter, , , , , ) = registry.tokens(chainID, token, 0);
+        (address contractAddress, address submitter, , , , , ) = registry.tokens(TokenStatus.PENDING, chainID, token);
         if (submitter == sender) return true;
 
         // Check approved tokens
-        (contractAddress, submitter, , , , , ) = registry.tokens(chainID, token, 1);
+        (contractAddress, submitter, , , , , ) = registry.tokens(TokenStatus.APPROVED, chainID, token);
         if (contractAddress != address(0)) {
             // Token is approved, only allow edits through proposal system
             return false;
@@ -272,7 +270,7 @@ contract TokentrollerV1 is ITokentroller {
     ) external view returns (bool) {
         // Allow anyone to propose edits for approved tokens
         TokenRegistry registry = TokenRegistry(tokenRegistry);
-        (address contractAddress, , , , , , ) = registry.tokens(chainID, token, 1);
+        (address contractAddress, , , , , , ) = registry.tokens(TokenStatus.APPROVED, chainID, token);
         return contractAddress != address(0);
     }
 

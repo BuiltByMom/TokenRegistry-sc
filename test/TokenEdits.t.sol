@@ -3,13 +3,13 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import "src/TokenRegistryEdits.sol";
+import "src/TokenEdits.sol";
 import "src/TokenRegistry.sol";
 import "src/TokentrollerV1.sol";
 import "src/interfaces/ITokenRegistry.sol";
 
-contract TokenRegistryEditsTest is Test {
-    TokenRegistryEdits tokenRegistryEdits;
+contract TokenEditsTest is Test {
+    TokenEdits tokenEdits;
     TokenRegistry tokenRegistry;
     TokentrollerV1 tokentroller;
     TokenMetadataRegistry metadataRegistry;
@@ -27,7 +27,7 @@ contract TokenRegistryEditsTest is Test {
         tokentroller = new TokentrollerV1(owner);
         tokenRegistry = TokenRegistry(tokentroller.tokenRegistry());
         metadataRegistry = TokenMetadataRegistry(tokentroller.metadataRegistry());
-        tokenRegistryEdits = TokenRegistryEdits(tokentroller.tokenRegistryEdits());
+        tokenEdits = TokenEdits(tokentroller.tokenEdits());
     }
 
     function testProposeEdit() public {
@@ -39,14 +39,7 @@ contract TokenRegistryEditsTest is Test {
 
         // Now propose an edit
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
 
         // Check that the edit is stored
         (
@@ -57,7 +50,7 @@ contract TokenRegistryEditsTest is Test {
             string memory logoURI,
             uint8 decimals,
             uint256 timestamp
-        ) = tokenRegistryEdits.editsOnTokens(chainID, tokenAddress, 1);
+        ) = tokenEdits.editsOnTokens(chainID, tokenAddress, 1);
 
         assertEq(name, "Updated Token", "Name should be in edit");
         assertEq(symbol, "UTK", "Symbol should be in edit");
@@ -74,14 +67,7 @@ contract TokenRegistryEditsTest is Test {
         // Try to propose edit for pending token
         vm.prank(nonOwner);
         vm.expectRevert("Token must be approved");
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
     }
 
     function testAcceptEdit() public {
@@ -93,18 +79,11 @@ contract TokenRegistryEditsTest is Test {
 
         // Create edit
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
 
         // Accept the edit
         vm.prank(owner);
-        tokenRegistryEdits.acceptEdit(tokenAddress, 1, chainID);
+        tokenEdits.acceptEdit(tokenAddress, 1, chainID);
 
         // Verify token was updated
         (
@@ -115,7 +94,7 @@ contract TokenRegistryEditsTest is Test {
             string memory symbol,
             uint8 decimals,
             uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 1);
+        ) = tokenRegistry.tokens(TokenStatus.APPROVED, chainID, tokenAddress);
 
         assertEq(name, "Updated Token", "Name should be updated");
         assertEq(symbol, "UTK", "Symbol should be updated");
@@ -132,21 +111,14 @@ contract TokenRegistryEditsTest is Test {
 
         // Create edit
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
 
         // Reject the edit
         vm.prank(owner);
-        tokenRegistryEdits.rejectEdit(tokenAddress, 1, chainID, "Invalid token symbol");
+        tokenEdits.rejectEdit(tokenAddress, 1, chainID, "Invalid token symbol");
 
         // Verify edit was cleared
-        (address submitter, , , , , , ) = tokenRegistryEdits.editsOnTokens(chainID, tokenAddress, 1);
+        (address submitter, , , , , , ) = tokenEdits.editsOnTokens(chainID, tokenAddress, 1);
         assertEq(submitter, address(0), "Edit should be cleared");
     }
 
@@ -159,19 +131,12 @@ contract TokenRegistryEditsTest is Test {
 
         // Create edit
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
 
         // Try to reject without permission
         vm.prank(nonOwner);
         vm.expectRevert("Not authorized to reject edit");
-        tokenRegistryEdits.rejectEdit(tokenAddress, 1, chainID, "Invalid token symbol");
+        tokenEdits.rejectEdit(tokenAddress, 1, chainID, "Invalid token symbol");
     }
 
     function testAcceptEditClearsOtherEdits() public {
@@ -183,34 +148,20 @@ contract TokenRegistryEditsTest is Test {
 
         // Create multiple edits
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token 1",
-            "UT1",
-            "https://example.com/logo1.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token 1", "UT1", "https://example.com/logo1.png", 9, chainID);
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token 2",
-            "UT2",
-            "https://example.com/logo2.png",
-            12,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token 2", "UT2", "https://example.com/logo2.png", 12, chainID);
 
         // Accept first edit
         vm.prank(owner);
-        tokenRegistryEdits.acceptEdit(tokenAddress, 1, chainID);
+        tokenEdits.acceptEdit(tokenAddress, 1, chainID);
 
         // Verify second edit was cleared
-        (address submitter, , , , , , ) = tokenRegistryEdits.editsOnTokens(chainID, tokenAddress, 2);
+        (address submitter, , , , , , ) = tokenEdits.editsOnTokens(chainID, tokenAddress, 2);
         assertEq(submitter, address(0), "Second edit should be cleared");
 
         // Verify edit count was reset
-        assertEq(tokenRegistryEdits.editCount(chainID, tokenAddress), 0, "Edit count should be reset");
+        assertEq(tokenEdits.editCount(chainID, tokenAddress), 0, "Edit count should be reset");
     }
 
     function testEditTracking() public {
@@ -221,27 +172,20 @@ contract TokenRegistryEditsTest is Test {
         tokenRegistry.approveToken(chainID, tokenAddress);
 
         // Verify no edits initially
-        assertEq(tokenRegistryEdits.getTokensWithEditsCount(chainID), 0);
+        assertEq(tokenEdits.getTokensWithEditsCount(chainID), 0);
 
         // Create first edit
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token", "UTK", "https://example.com/new_logo.png", 9, chainID);
 
         // Verify token is tracked
-        assertEq(tokenRegistryEdits.getTokensWithEditsCount(chainID), 1);
-        assertEq(tokenRegistryEdits.getTokenWithEdits(chainID, 0), tokenAddress);
-        assertEq(tokenRegistryEdits.editCount(chainID, tokenAddress), 1);
+        assertEq(tokenEdits.getTokensWithEditsCount(chainID), 1);
+        assertEq(tokenEdits.getTokenWithEdits(chainID, 0), tokenAddress);
+        assertEq(tokenEdits.editCount(chainID, tokenAddress), 1);
 
         // Create second edit
         vm.prank(nonOwner2);
-        tokenRegistryEdits.proposeEdit(
+        tokenEdits.proposeEdit(
             tokenAddress,
             "Updated Token 2",
             "UTK2",
@@ -251,8 +195,8 @@ contract TokenRegistryEditsTest is Test {
         );
 
         // Verify tracking remains correct
-        assertEq(tokenRegistryEdits.getTokensWithEditsCount(chainID), 1);
-        assertEq(tokenRegistryEdits.editCount(chainID, tokenAddress), 2);
+        assertEq(tokenEdits.getTokensWithEditsCount(chainID), 1);
+        assertEq(tokenEdits.editCount(chainID, tokenAddress), 2);
     }
 
     function testListEdits() public {
@@ -264,37 +208,19 @@ contract TokenRegistryEditsTest is Test {
 
         // Create multiple edits
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token 1",
-            "UT1",
-            "https://example.com/logo1.png",
-            9,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token 1", "UT1", "https://example.com/logo1.png", 9, chainID);
         vm.prank(nonOwner2);
-        tokenRegistryEdits.proposeEdit(
-            tokenAddress,
-            "Updated Token 2",
-            "UT2",
-            "https://example.com/logo2.png",
-            12,
-            chainID
-        );
+        tokenEdits.proposeEdit(tokenAddress, "Updated Token 2", "UT2", "https://example.com/logo2.png", 12, chainID);
 
         // Test listing with pagination
-        (TokenRegistryEdits.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenRegistryEdits.listEdits(
-            chainID,
-            0,
-            1
-        );
+        (TokenEdits.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenEdits.listEdits(chainID, 0, 1);
 
         assertEq(edits.length, 1);
         assertEq(edits[0].name, "Updated Token 1");
         assertTrue(hasMore);
 
         // Get second page
-        (edits, finalIndex, hasMore) = tokenRegistryEdits.listEdits(chainID, 1, 1);
+        (edits, finalIndex, hasMore) = tokenEdits.listEdits(chainID, 1, 1);
 
         assertEq(edits.length, 1);
         assertEq(edits[0].name, "Updated Token 2");
@@ -318,23 +244,11 @@ contract TokenRegistryEditsTest is Test {
 
         // Propose both edits
         vm.prank(nonOwner);
-        tokenRegistryEdits.proposeEditWithMetadata(
-            tokenAddress,
-            "Updated Token",
-            "UTEST",
-            "newlogo",
-            18,
-            chainID,
-            updates
-        );
+        tokenEdits.proposeEditWithMetadata(tokenAddress, "Updated Token", "UTEST", "newlogo", 18, chainID, updates);
 
         // Verify token edit was proposed
-        (TokenRegistryEdits.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenRegistryEdits.listEdits(
-            chainID,
-            0,
-            1
-        );
-        TokenRegistryEdits.TokenEdit memory tokenEdit = edits[0];
+        (TokenEdits.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenEdits.listEdits(chainID, 0, 1);
+        TokenEdits.TokenEdit memory tokenEdit = edits[0];
         assertEq(tokenEdit.name, "Updated Token");
         assertEq(tokenEdit.symbol, "UTEST");
 
