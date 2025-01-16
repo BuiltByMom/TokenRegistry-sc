@@ -6,19 +6,13 @@ import "./ISharedTypes.sol";
 interface IHelper {
     function addTokenWithMetadata(
         address contractAddress,
-        string memory name,
-        string memory symbol,
-        string memory logoURI,
-        uint8 decimals,
+        string calldata logoURI,
         MetadataInput[] calldata metadata
     ) external;
 
     function proposeEditWithMetadata(
         address contractAddress,
-        string memory name,
-        string memory symbol,
-        string memory logoURI,
-        uint8 decimals,
+        string calldata logoURI,
         MetadataInput[] calldata metadataUpdates
     ) external;
 }

@@ -1,180 +1,145 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./interfaces/ITokentroller.sol";
+import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./interfaces/ITokenRegistry.sol";
-import "./interfaces/ITokenMetadataRegistry.sol";
+import "./interfaces/ITokentroller.sol";
 
 contract TokenRegistry is ITokenRegistry {
-    // Main token storage - status => token address => token info
-    mapping(TokenStatus => mapping(address => Token)) public tokens;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
-    // Token addresses list
-    address[] public tokenAddresses;
+    mapping(TokenStatus => EnumerableSet.AddressSet) private tokensByStatus;
+    mapping(address => string) public tokenLogoURIs;
 
-    // Token counts per status
-    uint256 public pendingTokenCount;
-    uint256 public approvedTokenCount;
-    uint256 public rejectedTokenCount;
-
-    // Governance
     address public tokentroller;
-    address public metadataRegistry;
 
-    constructor(address _tokentroller, address _metadataRegistry) {
+    constructor(address _tokentroller) {
         tokentroller = _tokentroller;
-        metadataRegistry = _metadataRegistry;
     }
 
-    function addToken(
-        address contractAddress,
-        string memory name,
-        string memory symbol,
-        string memory logoURI,
-        uint8 decimals
-    ) public {
+    function addToken(address contractAddress, string calldata logoURI) external {
+        require(ITokentroller(tokentroller).canAddToken(msg.sender, contractAddress), "Not authorized to add token");
+
+        // Verify it's a valid ERC20 token
+        IERC20Metadata token = IERC20Metadata(contractAddress);
+        token.name(); // Will revert if not implemented
+        token.symbol();
+        token.decimals();
+
         require(
-            tokens[TokenStatus.PENDING][contractAddress].contractAddress == address(0) &&
-                tokens[TokenStatus.APPROVED][contractAddress].contractAddress == address(0),
+            !tokensByStatus[TokenStatus.PENDING].contains(contractAddress) &&
+                !tokensByStatus[TokenStatus.APPROVED].contains(contractAddress),
             "Token already exists in pending or approved state"
         );
-        require(contractAddress != address(0), "New token address cannot be zero");
-        require(ITokentroller(tokentroller).canAddToken(msg.sender, contractAddress), "Failed to add token");
 
-        Token memory newToken = Token({
-            contractAddress: contractAddress,
-            submitter: msg.sender,
-            name: name,
-            logoURI: logoURI,
-            symbol: symbol,
-            decimals: decimals
-        });
-
-        // If token was previously rejected, update it instead of adding new entry
-        if (tokens[TokenStatus.REJECTED][contractAddress].contractAddress != address(0)) {
-            delete tokens[TokenStatus.REJECTED][contractAddress];
-            rejectedTokenCount--;
-        } else {
-            tokenAddresses.push(contractAddress);
+        // Remove from rejected if exists
+        if (tokensByStatus[TokenStatus.REJECTED].contains(contractAddress)) {
+            tokensByStatus[TokenStatus.REJECTED].remove(contractAddress);
         }
 
-        tokens[TokenStatus.PENDING][contractAddress] = newToken;
-        pendingTokenCount++;
+        tokenLogoURIs[contractAddress] = logoURI;
+        tokensByStatus[TokenStatus.PENDING].add(contractAddress);
 
-        emit TokenAdded(contractAddress, name, symbol, logoURI, decimals);
+        emit TokenAdded(contractAddress, msg.sender);
     }
 
-    function approveToken(address contractAddress) public {
-        require(
-            tokens[TokenStatus.PENDING][contractAddress].contractAddress != address(0),
-            "Token must be in pending state"
-        );
-        require(ITokentroller(tokentroller).canApproveToken(msg.sender, contractAddress), "Failed to approve token");
+    function updateToken(address contractAddress, string calldata logoURI) external {
+        require(ITokentroller(tokentroller).canUpdateToken(msg.sender, contractAddress), "Not authorized");
 
-        Token memory token = tokens[TokenStatus.PENDING][contractAddress];
-        delete tokens[TokenStatus.PENDING][contractAddress];
-        tokens[TokenStatus.APPROVED][contractAddress] = token;
+        tokenLogoURIs[contractAddress] = logoURI;
 
-        pendingTokenCount--;
-        approvedTokenCount++;
-
-        emit TokenApproved(contractAddress);
+        emit TokenUpdated(contractAddress, logoURI);
     }
 
-    function rejectToken(address contractAddress, string calldata reason) public {
-        require(
-            tokens[TokenStatus.PENDING][contractAddress].contractAddress != address(0),
-            "Token must be in pending state"
-        );
-        require(ITokentroller(tokentroller).canRejectToken(msg.sender, contractAddress), "Failed to reject token");
+    function _getToken(address contractAddress) internal view returns (Token memory) {
+        return
+            Token({
+                contractAddress: contractAddress,
+                name: IERC20Metadata(contractAddress).name(),
+                symbol: IERC20Metadata(contractAddress).symbol(),
+                decimals: IERC20Metadata(contractAddress).decimals(),
+                logoURI: tokenLogoURIs[contractAddress]
+            });
+    }
 
-        Token memory token = tokens[TokenStatus.PENDING][contractAddress];
-        delete tokens[TokenStatus.PENDING][contractAddress];
-        tokens[TokenStatus.REJECTED][contractAddress] = token;
-
-        pendingTokenCount--;
-        rejectedTokenCount++;
-
-        emit TokenRejected(contractAddress, reason);
+    function getToken(address contractAddress) external view returns (Token memory) {
+        return _getToken(contractAddress);
     }
 
     function listTokens(
         uint256 offset,
         uint256 limit,
         TokenStatus status
-    ) external view returns (Token[] memory tokens_, uint256 total) {
-        require(limit > 0, "Limit must be greater than zero");
+    ) external view returns (Token[] memory tokens, uint256 total) {
+        EnumerableSet.AddressSet storage statusSet = tokensByStatus[status];
+        total = statusSet.length();
 
-        // Get the total count for the requested status
-        total = (status == TokenStatus.PENDING)
-            ? pendingTokenCount
-            : (status == TokenStatus.APPROVED)
-                ? approvedTokenCount
-                : rejectedTokenCount;
-
-        // Early return if no tokens or invalid initial index
-        if (total == 0 || offset >= total) {
+        if (offset >= total) {
             return (new Token[](0), total);
         }
 
-        // Calculate optimal array size
-        uint256 size = (offset + limit > total) ? total - offset : limit;
-        tokens_ = new Token[](size);
-
-        uint256 found; // Number of tokens found for the requested status
-        uint256 statusCount; // Running count of tokens matching the status
-
-        for (uint256 i = 0; i < tokenAddresses.length && found < size; i++) {
-            (Token memory token, bool exists) = _getTokenAtIndex(i, status);
-
-            if (exists) {
-                if (statusCount >= offset) {
-                    tokens_[found] = token;
-                    found++;
-                }
-                statusCount++;
-            }
+        uint256 end = offset + limit;
+        if (end > total) {
+            end = total;
         }
+        uint256 resultLength = end - offset;
+        tokens = new Token[](resultLength);
 
-        return (tokens_, total);
+        for (uint256 i = 0; i < resultLength; i++) {
+            address tokenAddress = statusSet.at(offset + i);
+            tokens[i] = _getToken(tokenAddress);
+        }
+    }
+
+    function tokenStatus(address contractAddress) external view returns (TokenStatus) {
+        if (tokensByStatus[TokenStatus.APPROVED].contains(contractAddress)) {
+            return TokenStatus.APPROVED;
+        } else if (tokensByStatus[TokenStatus.PENDING].contains(contractAddress)) {
+            return TokenStatus.PENDING;
+        } else if (tokensByStatus[TokenStatus.REJECTED].contains(contractAddress)) {
+            return TokenStatus.REJECTED;
+        } else {
+            return TokenStatus.NONE;
+        }
+    }
+
+    function approveToken(address contractAddress) external {
+        require(
+            ITokentroller(tokentroller).canApproveToken(msg.sender, contractAddress),
+            "Not authorized to approve token"
+        );
+
+        require(tokensByStatus[TokenStatus.PENDING].contains(contractAddress), "Token not found in pending state");
+
+        tokensByStatus[TokenStatus.PENDING].remove(contractAddress);
+        tokensByStatus[TokenStatus.APPROVED].add(contractAddress);
+
+        emit TokenApproved(contractAddress);
+    }
+
+    function rejectToken(address contractAddress, string calldata reason) external {
+        require(
+            ITokentroller(tokentroller).canRejectToken(msg.sender, contractAddress),
+            "Not authorized to reject token"
+        );
+
+        require(tokensByStatus[TokenStatus.PENDING].contains(contractAddress), "Token not found in pending state");
+
+        tokensByStatus[TokenStatus.PENDING].remove(contractAddress);
+        tokensByStatus[TokenStatus.REJECTED].add(contractAddress);
+
+        emit TokenRejected(contractAddress, reason);
+    }
+
+    function updateTokentroller(address newTokentroller) external {
+        require(msg.sender == tokentroller, "Not authorized");
+        tokentroller = newTokentroller;
     }
 
     function getTokenCounts() external view returns (uint256 pending, uint256 approved, uint256 rejected) {
-        return (pendingTokenCount, approvedTokenCount, rejectedTokenCount);
-    }
-
-    function tokenCount() external view returns (uint256) {
-        return tokenAddresses.length;
-    }
-
-    function _getTokenAtIndex(
-        uint256 index,
-        TokenStatus status
-    ) private view returns (Token memory token, bool exists) {
-        address tokenAddress = tokenAddresses[index];
-        token = tokens[status][tokenAddress];
-        exists = token.contractAddress != address(0);
-    }
-
-    function updateTokentroller(address newTokentroller) public {
-        require(msg.sender == tokentroller, "Only tokentroller can update");
-        tokentroller = newTokentroller;
-        emit TokentrollerUpdated(newTokentroller);
-    }
-
-    function updateToken(
-        address contractAddress,
-        string memory name,
-        string memory symbol,
-        string memory logoURI,
-        uint8 decimals
-    ) external {
-        require(ITokentroller(tokentroller).canUpdateToken(msg.sender, contractAddress), "Not authorized");
-        require(tokens[TokenStatus.APPROVED][contractAddress].contractAddress != address(0), "Token must be approved");
-
-        tokens[TokenStatus.APPROVED][contractAddress].name = name;
-        tokens[TokenStatus.APPROVED][contractAddress].symbol = symbol;
-        tokens[TokenStatus.APPROVED][contractAddress].logoURI = logoURI;
-        tokens[TokenStatus.APPROVED][contractAddress].decimals = decimals;
+        pending = tokensByStatus[TokenStatus.PENDING].length();
+        approved = tokensByStatus[TokenStatus.APPROVED].length();
+        rejected = tokensByStatus[TokenStatus.REJECTED].length();
     }
 }

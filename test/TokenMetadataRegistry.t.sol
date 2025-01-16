@@ -66,7 +66,7 @@ contract TokenMetadataRegistryTest is Test {
     function testSetMetadata() public {
         // First add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
 
         // First add the field
         vm.prank(owner);
@@ -83,7 +83,7 @@ contract TokenMetadataRegistryTest is Test {
     function testCannotSetInvalidField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
 
         vm.prank(nonOwner);
         vm.expectRevert("Invalid field");
@@ -93,7 +93,7 @@ contract TokenMetadataRegistryTest is Test {
     function testCannotSetInactiveField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
 
         // Add and then deactivate the field
         vm.prank(owner);
@@ -124,7 +124,7 @@ contract TokenMetadataRegistryTest is Test {
     function testGetAllMetadata() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
 
         // First add the fields
         vm.prank(owner);
@@ -157,7 +157,7 @@ contract TokenMetadataRegistryTest is Test {
     function testGetAllMetadataWithInactiveField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
 
         // Add and set fields
         vm.prank(owner);
@@ -193,7 +193,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Add token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
 
         // Prepare batch metadata
         MetadataInput[] memory inputs = new MetadataInput[](2);

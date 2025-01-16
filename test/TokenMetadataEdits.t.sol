@@ -36,7 +36,7 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 
@@ -70,7 +70,7 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 
@@ -103,7 +103,7 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 
@@ -136,7 +136,7 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 
@@ -169,7 +169,7 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 
@@ -212,12 +212,12 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve tokens
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token 1", "TEST1", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(token2, "Test Token 2", "TEST2", "logo", 18);
+        tokenRegistry.addToken(token2, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(token2);
 
@@ -256,7 +256,7 @@ contract TokenMetadataEditsTest is Test {
     function testInvalidFieldRejection() public {
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 
@@ -272,7 +272,7 @@ contract TokenMetadataEditsTest is Test {
     function testEmptyUpdatesRejection() public {
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "logo");
         vm.prank(owner);
         tokenRegistry.approveToken(tokenAddress);
 

@@ -9,5 +9,6 @@ struct MetadataInput {
 enum TokenStatus {
     PENDING,
     APPROVED,
-    REJECTED
+    REJECTED,
+    NONE
 }

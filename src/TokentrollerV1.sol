@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import "./interfaces/ITokentroller.sol";
+import "./interfaces/ITokenRegistry.sol";
 import "./TokenRegistry.sol";
 import "./TokenMetadataRegistry.sol";
 import "./TokenEdits.sol";
@@ -19,10 +20,10 @@ contract TokentrollerV1 is ITokentroller {
      *********************************************************************************************/
     constructor(address _owner) {
         owner = _owner;
+        tokenRegistry = address(new TokenRegistry(address(this)));
+        tokenEdits = address(new TokenEdits(address(this), tokenRegistry));
         metadataRegistry = address(new TokenMetadataRegistry(address(this)));
-        tokenRegistry = address(new TokenRegistry(address(this), metadataRegistry));
         metadataEdits = address(new TokenMetadataEdits(address(this), metadataRegistry));
-        tokenEdits = address(new TokenEdits(tokenRegistry, metadataEdits));
     }
 
     /**********************************************************************************************
@@ -103,8 +104,7 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be approved, false otherwise
      *********************************************************************************************/
     function canApproveToken(address sender, address contractAddress) public view returns (bool) {
-        require(sender == owner, "Only the owner can call this function");
-        return true;
+        return sender == owner;
     }
 
     /**********************************************************************************************
@@ -116,8 +116,7 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be rejected, false otherwise
      *********************************************************************************************/
     function canRejectToken(address sender, address contractAddress) public view returns (bool) {
-        require(sender == owner, "Only the owner can call this function");
-        return true;
+        return sender == owner;
     }
 
     /**********************************************************************************************
@@ -141,7 +140,9 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
     function canUpdateToken(address sender, address contractAddress) public view returns (bool) {
-        return sender == tokenEdits;
+        TokenRegistry registry = TokenRegistry(tokenRegistry);
+        TokenStatus status = registry.tokenStatus(contractAddress);
+        return sender == tokenEdits && status == TokenStatus.APPROVED;
     }
 
     /**********************************************************************************************
@@ -154,8 +155,7 @@ contract TokentrollerV1 is ITokentroller {
      *********************************************************************************************/
     function canProposeTokenEdit(address sender, address contractAddress) public view returns (bool) {
         // Check if the token is approved
-        (address tokenAddr, , , , , ) = TokenRegistry(tokenRegistry).tokens(TokenStatus.APPROVED, contractAddress);
-        return tokenAddr != address(0);
+        return TokenRegistry(tokenRegistry).tokenStatus(contractAddress) == TokenStatus.APPROVED;
     }
 
     /**********************************************************************************************
@@ -224,19 +224,14 @@ contract TokentrollerV1 is ITokentroller {
      *********************************************************************************************/
     function canSetMetadata(address sender, address token, string calldata field) external view returns (bool) {
         TokenRegistry registry = TokenRegistry(tokenRegistry);
-        // Check pending tokens first
-        (address contractAddress, address submitter, , , , ) = registry.tokens(TokenStatus.PENDING, token);
-        if (submitter == sender) return true;
+        TokenStatus status = registry.tokenStatus(token);
 
-        // Check approved tokens
-        (contractAddress, submitter, , , , ) = registry.tokens(TokenStatus.APPROVED, token);
-        if (contractAddress != address(0)) {
-            // Token is approved, only allow edits through proposal system
+        if (status == TokenStatus.APPROVED || status == TokenStatus.REJECTED) {
             return false;
         }
-
-        // Allow new token submissions
-        return submitter == address(0);
+        if (status == TokenStatus.PENDING || status == TokenStatus.NONE) {
+            return true;
+        }
     }
 
     /**********************************************************************************************
@@ -254,9 +249,7 @@ contract TokentrollerV1 is ITokentroller {
         MetadataInput[] calldata updates
     ) external view returns (bool) {
         // Allow anyone to propose edits for approved tokens
-        TokenRegistry registry = TokenRegistry(tokenRegistry);
-        (address contractAddress, , , , , ) = registry.tokens(TokenStatus.APPROVED, token);
-        return contractAddress != address(0);
+        return TokenRegistry(tokenRegistry).tokenStatus(token) == TokenStatus.APPROVED;
     }
 
     /**********************************************************************************************
