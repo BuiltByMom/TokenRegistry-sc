@@ -37,14 +37,6 @@ contract TokenEdits is ITokenEdits {
             "Not authorized to propose edit"
         );
 
-        // Verify token exists and is approved
-        (address tokenAddr, , , , , , ) = TokenRegistry(tokenRegistry).tokens(
-            TokenStatus.APPROVED,
-            chainID,
-            contractAddress
-        );
-        require(tokenAddr != address(0), "Token must be approved");
-
         uint256 newIndex = ++editCount[chainID][contractAddress];
 
         // Add to tokensWithEdits if this is the first edit

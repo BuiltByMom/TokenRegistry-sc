@@ -158,7 +158,13 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be updated, false otherwise
      *********************************************************************************************/
     function canProposeTokenEdit(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
-        return true;
+        // Check if the token is approved
+        (address tokenAddr, , , , , , ) = TokenRegistry(tokenRegistry).tokens(
+            TokenStatus.APPROVED,
+            chainID,
+            contractAddress
+        );
+        return tokenAddr != address(0);
     }
 
     /**********************************************************************************************
