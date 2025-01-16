@@ -13,7 +13,6 @@ contract UploadTokensScript is Script {
         string symbol;
         string logoURI;
         uint8 decimals;
-        uint256 chainId;
     }
 
     function run() public {
@@ -63,14 +62,13 @@ contract UploadTokensScript is Script {
                         token.name,
                         token.symbol,
                         token.logoURI,
-                        token.decimals,
-                        token.chainId
+                        token.decimals
                     )
                 {
                     successCount++;
                     // Approve every third token
                     if (i % 3 == 0) {
-                        try registry.approveToken(token.chainId, token.address_) {
+                        try registry.approveToken(token.address_) {
                             approvedCount++;
                             console.log("Approved token: %s", token.symbol);
                         } catch Error(string memory reason) {
@@ -112,8 +110,7 @@ contract UploadTokensScript is Script {
                 name: vm.parseJsonString(json, string.concat(prefix, ".name")),
                 symbol: vm.parseJsonString(json, string.concat(prefix, ".symbol")),
                 logoURI: vm.parseJsonString(json, string.concat(prefix, ".logoURI")),
-                decimals: uint8(vm.parseJsonUint(json, string.concat(prefix, ".decimals"))),
-                chainId: vm.parseJsonUint(json, string.concat(prefix, ".chainId"))
+                decimals: uint8(vm.parseJsonUint(json, string.concat(prefix, ".decimals")))
             });
     }
 }

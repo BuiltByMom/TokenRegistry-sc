@@ -6,16 +6,16 @@ import "./interfaces/ITokenRegistry.sol";
 import "./interfaces/ITokenMetadataRegistry.sol";
 
 contract TokenRegistry is ITokenRegistry {
-    // Main token storage - status => chainID => token address => token info
-    mapping(TokenStatus => mapping(uint256 => mapping(address => Token))) public tokens;
+    // Main token storage - status => token address => token info
+    mapping(TokenStatus => mapping(address => Token)) public tokens;
 
-    // Token addresses per chain
-    mapping(uint256 => address[]) public tokenAddresses;
+    // Token addresses list
+    address[] public tokenAddresses;
 
-    // Token counts per status per chain
-    mapping(uint256 => uint256) public pendingTokenCount;
-    mapping(uint256 => uint256) public approvedTokenCount;
-    mapping(uint256 => uint256) public rejectedTokenCount;
+    // Token counts per status
+    uint256 public pendingTokenCount;
+    uint256 public approvedTokenCount;
+    uint256 public rejectedTokenCount;
 
     // Governance
     address public tokentroller;
@@ -27,7 +27,6 @@ contract TokenRegistry is ITokenRegistry {
     }
 
     function addToken(
-        uint256 chainID,
         address contractAddress,
         string memory name,
         string memory symbol,
@@ -35,12 +34,12 @@ contract TokenRegistry is ITokenRegistry {
         uint8 decimals
     ) public {
         require(
-            tokens[TokenStatus.PENDING][chainID][contractAddress].contractAddress == address(0) &&
-                tokens[TokenStatus.APPROVED][chainID][contractAddress].contractAddress == address(0),
+            tokens[TokenStatus.PENDING][contractAddress].contractAddress == address(0) &&
+                tokens[TokenStatus.APPROVED][contractAddress].contractAddress == address(0),
             "Token already exists in pending or approved state"
         );
         require(contractAddress != address(0), "New token address cannot be zero");
-        require(ITokentroller(tokentroller).canAddToken(msg.sender, contractAddress, chainID), "Failed to add token");
+        require(ITokentroller(tokentroller).canAddToken(msg.sender, contractAddress), "Failed to add token");
 
         Token memory newToken = Token({
             contractAddress: contractAddress,
@@ -48,66 +47,58 @@ contract TokenRegistry is ITokenRegistry {
             name: name,
             logoURI: logoURI,
             symbol: symbol,
-            decimals: decimals,
-            chainID: chainID
+            decimals: decimals
         });
 
         // If token was previously rejected, update it instead of adding new entry
-        if (tokens[TokenStatus.REJECTED][chainID][contractAddress].contractAddress != address(0)) {
-            delete tokens[TokenStatus.REJECTED][chainID][contractAddress];
-            rejectedTokenCount[chainID]--;
+        if (tokens[TokenStatus.REJECTED][contractAddress].contractAddress != address(0)) {
+            delete tokens[TokenStatus.REJECTED][contractAddress];
+            rejectedTokenCount--;
         } else {
-            tokenAddresses[chainID].push(contractAddress);
+            tokenAddresses.push(contractAddress);
         }
 
-        tokens[TokenStatus.PENDING][chainID][contractAddress] = newToken;
-        pendingTokenCount[chainID]++;
+        tokens[TokenStatus.PENDING][contractAddress] = newToken;
+        pendingTokenCount++;
 
-        emit TokenAdded(contractAddress, name, symbol, logoURI, decimals, chainID);
+        emit TokenAdded(contractAddress, name, symbol, logoURI, decimals);
     }
 
-    function approveToken(uint256 chainID, address contractAddress) public {
+    function approveToken(address contractAddress) public {
         require(
-            tokens[TokenStatus.PENDING][chainID][contractAddress].contractAddress != address(0),
+            tokens[TokenStatus.PENDING][contractAddress].contractAddress != address(0),
             "Token must be in pending state"
         );
-        require(
-            ITokentroller(tokentroller).canApproveToken(msg.sender, contractAddress, chainID),
-            "Failed to approve token"
-        );
+        require(ITokentroller(tokentroller).canApproveToken(msg.sender, contractAddress), "Failed to approve token");
 
-        Token memory token = tokens[TokenStatus.PENDING][chainID][contractAddress];
-        delete tokens[TokenStatus.PENDING][chainID][contractAddress];
-        tokens[TokenStatus.APPROVED][chainID][contractAddress] = token;
+        Token memory token = tokens[TokenStatus.PENDING][contractAddress];
+        delete tokens[TokenStatus.PENDING][contractAddress];
+        tokens[TokenStatus.APPROVED][contractAddress] = token;
 
-        pendingTokenCount[chainID]--;
-        approvedTokenCount[chainID]++;
+        pendingTokenCount--;
+        approvedTokenCount++;
 
-        emit TokenApproved(contractAddress, chainID);
+        emit TokenApproved(contractAddress);
     }
 
-    function rejectToken(uint256 chainID, address contractAddress, string calldata reason) public {
+    function rejectToken(address contractAddress, string calldata reason) public {
         require(
-            tokens[TokenStatus.PENDING][chainID][contractAddress].contractAddress != address(0),
+            tokens[TokenStatus.PENDING][contractAddress].contractAddress != address(0),
             "Token must be in pending state"
         );
-        require(
-            ITokentroller(tokentroller).canRejectToken(msg.sender, contractAddress, chainID),
-            "Failed to reject token"
-        );
+        require(ITokentroller(tokentroller).canRejectToken(msg.sender, contractAddress), "Failed to reject token");
 
-        Token memory token = tokens[TokenStatus.PENDING][chainID][contractAddress];
-        delete tokens[TokenStatus.PENDING][chainID][contractAddress];
-        tokens[TokenStatus.REJECTED][chainID][contractAddress] = token;
+        Token memory token = tokens[TokenStatus.PENDING][contractAddress];
+        delete tokens[TokenStatus.PENDING][contractAddress];
+        tokens[TokenStatus.REJECTED][contractAddress] = token;
 
-        pendingTokenCount[chainID]--;
-        rejectedTokenCount[chainID]++;
+        pendingTokenCount--;
+        rejectedTokenCount++;
 
-        emit TokenRejected(contractAddress, chainID, reason);
+        emit TokenRejected(contractAddress, reason);
     }
 
     function listTokens(
-        uint256 chainID,
         uint256 offset,
         uint256 limit,
         TokenStatus status
@@ -116,10 +107,10 @@ contract TokenRegistry is ITokenRegistry {
 
         // Get the total count for the requested status
         total = (status == TokenStatus.PENDING)
-            ? pendingTokenCount[chainID]
+            ? pendingTokenCount
             : (status == TokenStatus.APPROVED)
-                ? approvedTokenCount[chainID]
-                : rejectedTokenCount[chainID];
+                ? approvedTokenCount
+                : rejectedTokenCount;
 
         // Early return if no tokens or invalid initial index
         if (total == 0 || offset >= total) {
@@ -133,8 +124,8 @@ contract TokenRegistry is ITokenRegistry {
         uint256 found; // Number of tokens found for the requested status
         uint256 statusCount; // Running count of tokens matching the status
 
-        for (uint256 i = 0; i < tokenAddresses[chainID].length && found < size; i++) {
-            (Token memory token, bool exists) = _getTokenAtIndex(chainID, i, status);
+        for (uint256 i = 0; i < tokenAddresses.length && found < size; i++) {
+            (Token memory token, bool exists) = _getTokenAtIndex(i, status);
 
             if (exists) {
                 if (statusCount >= offset) {
@@ -148,23 +139,20 @@ contract TokenRegistry is ITokenRegistry {
         return (tokens_, total);
     }
 
-    function getTokenCounts(
-        uint256 chainID
-    ) external view returns (uint256 pending, uint256 approved, uint256 rejected) {
-        return (pendingTokenCount[chainID], approvedTokenCount[chainID], rejectedTokenCount[chainID]);
+    function getTokenCounts() external view returns (uint256 pending, uint256 approved, uint256 rejected) {
+        return (pendingTokenCount, approvedTokenCount, rejectedTokenCount);
     }
 
-    function tokenCount(uint256 chainID) external view returns (uint256) {
-        return tokenAddresses[chainID].length;
+    function tokenCount() external view returns (uint256) {
+        return tokenAddresses.length;
     }
 
     function _getTokenAtIndex(
-        uint256 chainID,
         uint256 index,
         TokenStatus status
     ) private view returns (Token memory token, bool exists) {
-        address tokenAddress = tokenAddresses[chainID][index];
-        token = tokens[status][chainID][tokenAddress];
+        address tokenAddress = tokenAddresses[index];
+        token = tokens[status][tokenAddress];
         exists = token.contractAddress != address(0);
     }
 
@@ -175,22 +163,18 @@ contract TokenRegistry is ITokenRegistry {
     }
 
     function updateToken(
-        uint256 chainID,
         address contractAddress,
         string memory name,
         string memory symbol,
         string memory logoURI,
         uint8 decimals
     ) external {
-        require(ITokentroller(tokentroller).canUpdateToken(msg.sender, contractAddress, chainID), "Not authorized");
-        require(
-            tokens[TokenStatus.APPROVED][chainID][contractAddress].contractAddress != address(0),
-            "Token must be approved"
-        );
+        require(ITokentroller(tokentroller).canUpdateToken(msg.sender, contractAddress), "Not authorized");
+        require(tokens[TokenStatus.APPROVED][contractAddress].contractAddress != address(0), "Token must be approved");
 
-        tokens[TokenStatus.APPROVED][chainID][contractAddress].name = name;
-        tokens[TokenStatus.APPROVED][chainID][contractAddress].symbol = symbol;
-        tokens[TokenStatus.APPROVED][chainID][contractAddress].logoURI = logoURI;
-        tokens[TokenStatus.APPROVED][chainID][contractAddress].decimals = decimals;
+        tokens[TokenStatus.APPROVED][contractAddress].name = name;
+        tokens[TokenStatus.APPROVED][contractAddress].symbol = symbol;
+        tokens[TokenStatus.APPROVED][contractAddress].logoURI = logoURI;
+        tokens[TokenStatus.APPROVED][contractAddress].decimals = decimals;
     }
 }

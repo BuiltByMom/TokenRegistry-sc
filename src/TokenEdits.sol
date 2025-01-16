@@ -9,9 +9,9 @@ import "./interfaces/ITokenEdits.sol";
 
 contract TokenEdits is ITokenEdits {
     // Storage
-    mapping(uint256 => mapping(address => mapping(uint256 => TokenEdit))) public editsOnTokens;
-    mapping(uint256 => mapping(address => uint256)) public editCount;
-    mapping(uint256 => address[]) public tokensWithEdits;
+    mapping(address => mapping(uint256 => TokenEdit)) public editsOnTokens;
+    mapping(address => uint256) public editCount;
+    address[] public tokensWithEdits;
 
     // Governance
     address public tokenRegistry;
@@ -29,24 +29,18 @@ contract TokenEdits is ITokenEdits {
         string memory name,
         string memory symbol,
         string memory logoURI,
-        uint8 decimals,
-        uint256 chainID
-    ) public {
+        uint8 decimals
+    ) external {
         require(
-            ITokentroller(tokentroller).canProposeTokenEdit(msg.sender, contractAddress, chainID),
+            ITokentroller(tokentroller).canProposeTokenEdit(msg.sender, contractAddress),
             "Not authorized to propose edit"
         );
 
-        uint256 newIndex = ++editCount[chainID][contractAddress];
+        editCount[contractAddress]++;
+        uint256 currentEditIndex = editCount[contractAddress];
 
-        // Add to tokensWithEdits if this is the first edit
-        if (newIndex == 1) {
-            tokensWithEdits[chainID].push(contractAddress);
-        }
-
-        editsOnTokens[chainID][contractAddress][newIndex] = TokenEdit({
+        editsOnTokens[contractAddress][currentEditIndex] = TokenEdit({
             submitter: msg.sender,
-            chainID: chainID,
             name: name,
             symbol: symbol,
             logoURI: logoURI,
@@ -54,66 +48,62 @@ contract TokenEdits is ITokenEdits {
             timestamp: block.timestamp
         });
 
-        emit EditProposed(contractAddress, msg.sender, name, symbol, logoURI, decimals, chainID);
+        if (!_isTokenInEdits(contractAddress)) {
+            tokensWithEdits.push(contractAddress);
+        }
+
+        emit EditProposed(contractAddress, msg.sender, name, symbol, logoURI, decimals);
     }
 
-    function acceptEdit(address contractAddress, uint256 editIndex, uint256 chainID) external {
+    function acceptEdit(address contractAddress, uint256 editIndex) external {
         require(
-            ITokentroller(tokentroller).canAcceptTokenEdit(msg.sender, contractAddress, chainID, editIndex),
+            ITokentroller(tokentroller).canAcceptTokenEdit(msg.sender, contractAddress, editIndex),
             "Not authorized to accept edit"
         );
-        require(editIndex <= editCount[chainID][contractAddress], "Invalid edit index");
-        require(editCount[chainID][contractAddress] > 0, "No edits exist");
+        require(editIndex <= editCount[contractAddress], "Invalid edit index");
+        require(editCount[contractAddress] > 0, "No edits exist");
 
-        TokenEdit storage edit = editsOnTokens[chainID][contractAddress][editIndex];
+        TokenEdit storage edit = editsOnTokens[contractAddress][editIndex];
         require(edit.submitter != address(0), "Edit does not exist");
 
         // Update the token in the registry
-        TokenRegistry(tokenRegistry).updateToken(
-            chainID,
-            contractAddress,
-            edit.name,
-            edit.symbol,
-            edit.logoURI,
-            edit.decimals
-        );
+        TokenRegistry(tokenRegistry).updateToken(contractAddress, edit.name, edit.symbol, edit.logoURI, edit.decimals);
 
         // Clear all edits and remove from tracking
-        for (uint256 i = 1; i <= editCount[chainID][contractAddress]; i++) {
-            delete editsOnTokens[chainID][contractAddress][i];
+        for (uint256 i = 1; i <= editCount[contractAddress]; i++) {
+            delete editsOnTokens[contractAddress][i];
         }
-        editCount[chainID][contractAddress] = 0;
+        editCount[contractAddress] = 0;
 
-        _removeTokenFromEdits(chainID, contractAddress);
+        _removeTokenFromEdits(contractAddress);
 
-        emit EditAccepted(contractAddress, editIndex, chainID);
+        emit EditAccepted(contractAddress, editIndex);
     }
 
-    function rejectEdit(address contractAddress, uint256 editIndex, uint256 chainID, string calldata reason) external {
+    function rejectEdit(address contractAddress, uint256 editIndex, string calldata reason) external {
         require(
-            ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, contractAddress, chainID, editIndex),
+            ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, contractAddress, editIndex),
             "Not authorized to reject edit"
         );
-        require(editIndex <= editCount[chainID][contractAddress], "Invalid edit index");
-        require(editCount[chainID][contractAddress] > 0, "No edits exist");
+        require(editIndex <= editCount[contractAddress], "Invalid edit index");
+        require(editCount[contractAddress] > 0, "No edits exist");
 
-        TokenEdit storage edit = editsOnTokens[chainID][contractAddress][editIndex];
+        TokenEdit storage edit = editsOnTokens[contractAddress][editIndex];
         require(edit.submitter != address(0), "Edit does not exist");
 
         // Clear the rejected edit
-        delete editsOnTokens[chainID][contractAddress][editIndex];
-        editCount[chainID][contractAddress]--;
+        delete editsOnTokens[contractAddress][editIndex];
+        editCount[contractAddress]--;
 
         // If no more edits, remove from tracking
-        if (editCount[chainID][contractAddress] == 0) {
-            _removeTokenFromEdits(chainID, contractAddress);
+        if (editCount[contractAddress] == 0) {
+            _removeTokenFromEdits(contractAddress);
         }
 
-        emit EditRejected(contractAddress, editIndex, chainID, reason);
+        emit EditRejected(contractAddress, editIndex, reason);
     }
 
     function listEdits(
-        uint256 chainID,
         uint256 initialIndex,
         uint256 size
     ) public view returns (TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) {
@@ -121,8 +111,8 @@ contract TokenEdits is ITokenEdits {
 
         // Count total edits
         uint256 totalEdits = 0;
-        for (uint256 i = 0; i < tokensWithEdits[chainID].length; i++) {
-            totalEdits += editCount[chainID][tokensWithEdits[chainID][i]];
+        for (uint256 i = 0; i < tokensWithEdits.length; i++) {
+            totalEdits += editCount[tokensWithEdits[i]];
         }
 
         if (totalEdits == 0 || initialIndex >= totalEdits) {
@@ -132,26 +122,21 @@ contract TokenEdits is ITokenEdits {
         uint256 arraySize = size > (totalEdits - initialIndex) ? (totalEdits - initialIndex) : size;
         edits = new TokenEdit[](arraySize);
 
-        EditParams memory params = EditParams({
-            chainID: chainID,
-            initialIndex: initialIndex,
-            size: arraySize,
-            totalEdits: totalEdits
-        });
+        EditParams memory params = EditParams({ initialIndex: initialIndex, size: arraySize, totalEdits: totalEdits });
 
         (finalIndex, hasMore) = _getEdits(edits, params);
     }
 
-    function getTokensWithEditsCount(uint256 chainID) external view returns (uint256) {
-        return tokensWithEdits[chainID].length;
+    function getTokensWithEditsCount() external view returns (uint256) {
+        return tokensWithEdits.length;
     }
 
-    function getTokenWithEdits(uint256 chainID, uint256 index) external view returns (address) {
-        return tokensWithEdits[chainID][index];
+    function getTokenWithEdits(uint256 index) external view returns (address) {
+        return tokensWithEdits[index];
     }
 
-    function getEditCount(uint256 chainID, address token) external view returns (uint256) {
-        return editCount[chainID][token];
+    function getEditCount(address token) external view returns (uint256) {
+        return editCount[token];
     }
 
     function _getEdits(
@@ -161,17 +146,16 @@ contract TokenEdits is ITokenEdits {
         uint256 found;
         uint256 editCounter;
 
-        for (uint256 i = 0; i < tokensWithEdits[params.chainID].length && found < params.size; i++) {
-            address tokenAddr = tokensWithEdits[params.chainID][i];
-            uint256 tokenEditCount = editCount[params.chainID][tokenAddr];
+        for (uint256 i = 0; i < tokensWithEdits.length && found < params.size; i++) {
+            address tokenAddr = tokensWithEdits[i];
+            uint256 tokenEditCount = editCount[tokenAddr];
 
             for (uint256 j = 1; j <= tokenEditCount && found < params.size; j++) {
                 if (editCounter >= params.initialIndex) {
-                    TokenEdit memory edit = editsOnTokens[params.chainID][tokenAddr][j];
+                    TokenEdit memory edit = editsOnTokens[tokenAddr][j];
                     if (edit.submitter != address(0)) {
                         edits[found] = TokenEdit({
                             submitter: edit.submitter,
-                            chainID: edit.chainID,
                             name: edit.name,
                             symbol: edit.symbol,
                             decimals: edit.decimals,
@@ -189,13 +173,21 @@ contract TokenEdits is ITokenEdits {
         hasMore = (params.totalEdits - params.initialIndex) > params.size;
     }
 
+    function _isTokenInEdits(address token) internal view returns (bool) {
+        for (uint256 i = 0; i < tokensWithEdits.length; i++) {
+            if (tokensWithEdits[i] == token) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Internal Functions
-    function _removeTokenFromEdits(uint256 chainID, address token) internal {
-        address[] storage edits = tokensWithEdits[chainID];
-        for (uint256 i = 0; i < edits.length; i++) {
-            if (edits[i] == token) {
-                edits[i] = edits[edits.length - 1];
-                edits.pop();
+    function _removeTokenFromEdits(address token) internal {
+        for (uint256 i = 0; i < tokensWithEdits.length; i++) {
+            if (tokensWithEdits[i] == token) {
+                tokensWithEdits[i] = tokensWithEdits[tokensWithEdits.length - 1];
+                tokensWithEdits.pop();
                 break;
             }
         }

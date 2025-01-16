@@ -17,16 +17,10 @@ contract TokenMetadataEditsTest is Test {
     address nonOwner = address(2);
     address nonOwner2 = address(3);
     address tokenAddress = address(4);
-    uint256 chainID = 1;
 
-    event MetadataEditProposed(
-        address indexed token,
-        uint256 indexed chainID,
-        address submitter,
-        MetadataInput[] updates
-    );
-    event MetadataEditAccepted(address indexed token, uint256 indexed editIndex, uint256 chainID);
-    event MetadataEditRejected(address indexed token, uint256 indexed editIndex, uint256 chainID, string reason);
+    event MetadataEditProposed(address indexed token, address submitter, MetadataInput[] updates);
+    event MetadataEditAccepted(address indexed token, uint256 indexed editIndex);
+    event MetadataEditRejected(address indexed token, uint256 indexed editIndex, string reason);
 
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
@@ -42,9 +36,9 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -52,25 +46,20 @@ contract TokenMetadataEditsTest is Test {
 
         // Propose edit
         vm.prank(nonOwner);
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates);
 
         // Verify tracking
-        assertEq(metadataEdits.tokensMetadataWithEditsLength(chainID), 1);
-        assertEq(metadataEdits.getTokensMetadataWithEdits(chainID, 0), tokenAddress);
-        assertEq(metadataEdits.getEditCount(chainID, tokenAddress), 1);
+        assertEq(metadataEdits.tokensMetadataWithEditsLength(), 1);
+        assertEq(metadataEdits.getTokensMetadataWithEdits(0), tokenAddress);
+        assertEq(metadataEdits.getEditCount(tokenAddress), 1);
 
         // Get proposal details
-        ITokenMetadataEdits.MetadataEditProposal memory proposal = metadataEdits.getEditProposal(
-            chainID,
-            tokenAddress,
-            1
-        );
+        ITokenMetadataEdits.MetadataEditProposal memory proposal = metadataEdits.getEditProposal(tokenAddress, 1);
 
         // Verify stored proposal
         assertEq(proposal.submitter, nonOwner);
         assertEq(proposal.updates[0].field, "website");
         assertEq(proposal.updates[0].value, "https://example.com");
-        assertEq(proposal.chainID, chainID);
         assertTrue(proposal.timestamp > 0);
     }
 
@@ -81,9 +70,9 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -91,18 +80,18 @@ contract TokenMetadataEditsTest is Test {
 
         // Propose edit
         vm.prank(nonOwner);
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates);
 
         // Accept edit
         vm.prank(owner);
-        metadataEdits.acceptMetadataEdit(tokenAddress, chainID, 1);
+        metadataEdits.acceptMetadataEdit(tokenAddress, 1);
 
         // Verify metadata was updated
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "website"), "https://example.com");
+        assertEq(metadataRegistry.getMetadata(tokenAddress, "website"), "https://example.com");
 
         // Verify tracking was cleared
-        assertEq(metadataEdits.tokensMetadataWithEditsLength(chainID), 0);
-        assertEq(metadataEdits.getEditCount(chainID, tokenAddress), 0);
+        assertEq(metadataEdits.tokensMetadataWithEditsLength(), 0);
+        assertEq(metadataEdits.getEditCount(tokenAddress), 0);
     }
 
     function testAcceptMultipleMetadataEdit() public {
@@ -114,9 +103,9 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](2);
@@ -125,19 +114,19 @@ contract TokenMetadataEditsTest is Test {
 
         // Propose edit
         vm.prank(nonOwner);
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates);
 
         // Accept edit
         vm.prank(owner);
-        metadataEdits.acceptMetadataEdit(tokenAddress, chainID, 1);
+        metadataEdits.acceptMetadataEdit(tokenAddress, 1);
 
         // Verify metadata was updated
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "website"), "https://example.com");
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "twitter"), "@example");
+        assertEq(metadataRegistry.getMetadata(tokenAddress, "website"), "https://example.com");
+        assertEq(metadataRegistry.getMetadata(tokenAddress, "twitter"), "@example");
 
         // Verify tracking was cleared
-        assertEq(metadataEdits.tokensMetadataWithEditsLength(chainID), 0);
-        assertEq(metadataEdits.getEditCount(chainID, tokenAddress), 0);
+        assertEq(metadataEdits.tokensMetadataWithEditsLength(), 0);
+        assertEq(metadataEdits.getEditCount(tokenAddress), 0);
     }
 
     function testRejectMetadataEdit() public {
@@ -147,9 +136,9 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         // Create metadata updates
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -157,18 +146,18 @@ contract TokenMetadataEditsTest is Test {
 
         // Propose edit
         vm.prank(nonOwner);
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates);
 
         // Reject edit
         vm.prank(owner);
-        metadataEdits.rejectMetadataEdit(tokenAddress, chainID, 1, "Invalid website URL");
+        metadataEdits.rejectMetadataEdit(tokenAddress, 1, "Invalid website URL");
 
         // Verify tracking was cleared
-        assertEq(metadataEdits.tokensMetadataWithEditsLength(chainID), 0);
-        assertEq(metadataEdits.getEditCount(chainID, tokenAddress), 0);
+        assertEq(metadataEdits.tokensMetadataWithEditsLength(), 0);
+        assertEq(metadataEdits.getEditCount(tokenAddress), 0);
 
         // Verify metadata was not updated
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "website"), "");
+        assertEq(metadataRegistry.getMetadata(tokenAddress, "website"), "");
     }
 
     function testListMetadataEdits() public {
@@ -180,27 +169,27 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         // Create first edit
         MetadataInput[] memory updates1 = new MetadataInput[](1);
         updates1[0] = MetadataInput({ field: "website", value: "https://example1.com" });
 
         vm.prank(nonOwner);
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates1);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates1);
 
         // Create second edit
         MetadataInput[] memory updates2 = new MetadataInput[](1);
         updates2[0] = MetadataInput({ field: "twitter", value: "@example2" });
 
         vm.prank(nonOwner2);
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates2);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates2);
 
         // Test listing with pagination
         (ITokenMetadataEdits.MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) = metadataEdits
-            .listAllEdits(chainID, 0, 1);
+            .listAllEdits(0, 1);
 
         assertEq(edits.length, 1);
         assertEq(edits[0].submitter, nonOwner);
@@ -209,7 +198,7 @@ contract TokenMetadataEditsTest is Test {
         assertTrue(hasMore);
 
         // Get second page
-        (edits, finalIndex, hasMore) = metadataEdits.listAllEdits(chainID, 1, 1);
+        (edits, finalIndex, hasMore) = metadataEdits.listAllEdits(1, 1);
 
         assertEq(edits.length, 1);
         assertEq(edits[0].submitter, nonOwner2);
@@ -223,14 +212,14 @@ contract TokenMetadataEditsTest is Test {
 
         // Add and approve tokens
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token 1", "TEST1", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token 1", "TEST1", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, token2, "Test Token 2", "TEST2", "logo", 18);
+        tokenRegistry.addToken(token2, "Test Token 2", "TEST2", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, token2);
+        tokenRegistry.approveToken(token2);
 
         // Setup metadata fields
         vm.prank(owner);
@@ -241,23 +230,23 @@ contract TokenMetadataEditsTest is Test {
         updates1[0] = MetadataInput({ field: "website", value: "https://example1.com" });
 
         vm.prank(nonOwner);
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates1);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates1);
 
         // Create edit for second token
         MetadataInput[] memory updates2 = new MetadataInput[](1);
         updates2[0] = MetadataInput({ field: "website", value: "https://example2.com" });
 
         vm.prank(nonOwner2);
-        metadataEdits.proposeMetadataEdit(token2, chainID, updates2);
+        metadataEdits.proposeMetadataEdit(token2, updates2);
 
         // Verify tracking
-        assertEq(metadataEdits.tokensMetadataWithEditsLength(chainID), 2);
-        assertEq(metadataEdits.getTokensMetadataWithEdits(chainID, 0), tokenAddress);
-        assertEq(metadataEdits.getTokensMetadataWithEdits(chainID, 1), token2);
+        assertEq(metadataEdits.tokensMetadataWithEditsLength(), 2);
+        assertEq(metadataEdits.getTokensMetadataWithEdits(0), tokenAddress);
+        assertEq(metadataEdits.getTokensMetadataWithEdits(1), token2);
 
         // List all edits
         (ITokenMetadataEdits.MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) = metadataEdits
-            .listAllEdits(chainID, 0, 10);
+            .listAllEdits(0, 10);
 
         assertEq(edits.length, 2);
         assertEq(edits[0].token, tokenAddress);
@@ -267,9 +256,9 @@ contract TokenMetadataEditsTest is Test {
     function testInvalidFieldRejection() public {
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         // Try to propose edit with invalid field
         MetadataInput[] memory updates = new MetadataInput[](1);
@@ -277,21 +266,21 @@ contract TokenMetadataEditsTest is Test {
 
         vm.prank(nonOwner);
         vm.expectRevert("Invalid field");
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates);
     }
 
     function testEmptyUpdatesRejection() public {
         // Add and approve token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(tokenAddress);
 
         // Try to propose edit with no updates
         MetadataInput[] memory updates = new MetadataInput[](0);
 
         vm.prank(nonOwner);
         vm.expectRevert("No updates provided");
-        metadataEdits.proposeMetadataEdit(tokenAddress, chainID, updates);
+        metadataEdits.proposeMetadataEdit(tokenAddress, updates);
     }
 }

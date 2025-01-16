@@ -5,7 +5,6 @@ import "./ISharedTypes.sol";
 
 interface IHelper {
     function addTokenWithMetadata(
-        uint256 chainID,
         address contractAddress,
         string memory name,
         string memory symbol,
@@ -20,7 +19,6 @@ interface IHelper {
         string memory symbol,
         string memory logoURI,
         uint8 decimals,
-        uint256 chainID,
         MetadataInput[] calldata metadataUpdates
     ) external;
 }

@@ -98,12 +98,11 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a token can be approved
      * @param sender The address of the sender
      * @param contractAddress The address of the token to potentially approve
-     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing approval
      * @return bool Returns true if the token can be approved, false otherwise
      *********************************************************************************************/
-    function canApproveToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+    function canApproveToken(address sender, address contractAddress) public view returns (bool) {
         require(sender == owner, "Only the owner can call this function");
         return true;
     }
@@ -112,12 +111,11 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a token can be rejected
      * @param sender The address of the sender
      * @param contractAddress The address of the token to potentially reject
-     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing rejection
      * @return bool Returns true if the token can be rejected, false otherwise
      *********************************************************************************************/
-    function canRejectToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+    function canRejectToken(address sender, address contractAddress) public view returns (bool) {
         require(sender == owner, "Only the owner can call this function");
         return true;
     }
@@ -126,12 +124,11 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a new token can be added to the registry
      * @param sender The address of the sender
      * @param contractAddress The address of the new token to be added
-     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canAddToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+    function canAddToken(address sender, address contractAddress) public view returns (bool) {
         return true;
     }
 
@@ -139,12 +136,11 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a new token can be added to the registry
      * @param sender The address of the sender
      * @param contractAddress The address of the new token to be added
-     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canUpdateToken(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+    function canUpdateToken(address sender, address contractAddress) public view returns (bool) {
         return sender == tokenEdits;
     }
 
@@ -152,18 +148,13 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a token in the registry can be updated
      * @param sender The address of the sender
      * @param contractAddress The address of the token to update
-     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token updates
      * @return bool Returns true if the token can be updated, false otherwise
      *********************************************************************************************/
-    function canProposeTokenEdit(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+    function canProposeTokenEdit(address sender, address contractAddress) public view returns (bool) {
         // Check if the token is approved
-        (address tokenAddr, , , , , , ) = TokenRegistry(tokenRegistry).tokens(
-            TokenStatus.APPROVED,
-            chainID,
-            contractAddress
-        );
+        (address tokenAddr, , , , , ) = TokenRegistry(tokenRegistry).tokens(TokenStatus.APPROVED, contractAddress);
         return tokenAddr != address(0);
     }
 
@@ -171,18 +162,12 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a token edit can be accepted
      * @param sender The address of the sender
      * @param contractAddress The address of the token for which the edit is proposed
-     * @param chainID The chain ID of the token
      * @param editIndex The index of the edit to be accepted
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing edit acceptance
      * @return bool Returns true if the edit can be accepted, false otherwise
      *********************************************************************************************/
-    function canAcceptTokenEdit(
-        address sender,
-        address contractAddress,
-        uint256 chainID,
-        uint256 editIndex
-    ) public view returns (bool) {
+    function canAcceptTokenEdit(address sender, address contractAddress, uint256 editIndex) public view returns (bool) {
         return sender == owner;
     }
 
@@ -190,7 +175,6 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a token edit can be rejected
      * @param sender The address of the sender
      * @param contractAddress The address of the token for which the edit is proposed
-     * @param chainID The chain ID of the token
      * @param editIndex The index of the edit to be rejected
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing edit rejection
@@ -199,7 +183,6 @@ contract TokentrollerV1 is ITokentroller {
     function canRejectTokenEdit(
         address sender,
         address contractAddress,
-        uint256 chainID,
         uint256 editIndex
     ) external view returns (bool) {
         return sender == owner;
@@ -234,25 +217,19 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a metadata field can be set
      * @param sender The address of the sender
      * @param token The address of the token
-     * @param chainID The chain ID of the token
      * @param field The name of the metadata field
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing metadata field updates
      * @return bool Returns true if the metadata field can be updated, false otherwise
      *********************************************************************************************/
-    function canSetMetadata(
-        address sender,
-        address token,
-        uint256 chainID,
-        string calldata field
-    ) external view returns (bool) {
+    function canSetMetadata(address sender, address token, string calldata field) external view returns (bool) {
         TokenRegistry registry = TokenRegistry(tokenRegistry);
         // Check pending tokens first
-        (address contractAddress, address submitter, , , , , ) = registry.tokens(TokenStatus.PENDING, chainID, token);
+        (address contractAddress, address submitter, , , , ) = registry.tokens(TokenStatus.PENDING, token);
         if (submitter == sender) return true;
 
         // Check approved tokens
-        (contractAddress, submitter, , , , , ) = registry.tokens(TokenStatus.APPROVED, chainID, token);
+        (contractAddress, submitter, , , , ) = registry.tokens(TokenStatus.APPROVED, token);
         if (contractAddress != address(0)) {
             // Token is approved, only allow edits through proposal system
             return false;
@@ -266,7 +243,6 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a metadata edit can be proposed
      * @param sender The address of the sender
      * @param token The address of the token
-     * @param chainID The chain ID of the token
      * @param updates The array of MetadataInput structs
      * @notice This function is called by the TokenMetadataRegistry contract
      * @notice This function verifies that the token is approved
@@ -275,12 +251,11 @@ contract TokentrollerV1 is ITokentroller {
     function canProposeMetadataEdit(
         address sender,
         address token,
-        uint256 chainID,
         MetadataInput[] calldata updates
     ) external view returns (bool) {
         // Allow anyone to propose edits for approved tokens
         TokenRegistry registry = TokenRegistry(tokenRegistry);
-        (address contractAddress, , , , , , ) = registry.tokens(TokenStatus.APPROVED, chainID, token);
+        (address contractAddress, , , , , ) = registry.tokens(TokenStatus.APPROVED, token);
         return contractAddress != address(0);
     }
 
@@ -288,12 +263,11 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a metadata can be updated
      * @param sender The address of the sender
      * @param contractAddress The address of the new token to be added
-     * @param chainID The chain ID of the token
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canUpdateMetadata(address sender, address contractAddress, uint256 chainID) public view returns (bool) {
+    function canUpdateMetadata(address sender, address contractAddress) public view returns (bool) {
         return sender == metadataEdits;
     }
 
@@ -301,18 +275,12 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a metadata edit can be accepted
      * @param sender The address of the sender
      * @param token The address of the token
-     * @param chainID The chain ID of the token
      * @param editIndex The index of the edit to be accepted
      * @notice This function is called by the TokenMetadataRegistry contract
      * @notice This function verifies that the sender is the owner
      * @return bool Returns true if the metadata edit can be accepted, false otherwise
      *********************************************************************************************/
-    function canAcceptMetadataEdit(
-        address sender,
-        address token,
-        uint256 chainID,
-        uint256 editIndex
-    ) external view returns (bool) {
+    function canAcceptMetadataEdit(address sender, address token, uint256 editIndex) external view returns (bool) {
         return sender == owner;
     }
 
@@ -320,18 +288,12 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a metadata edit can be rejected
      * @param sender The address of the sender
      * @param token The address of the token
-     * @param chainID The chain ID of the token
      * @param editIndex The index of the edit to be rejected
      * @notice This function is called by the TokenMetadataRegistry contract
      * @notice This function verifies that the sender is the owner
      * @return bool Returns true if the metadata edit can be rejected, false otherwise
      *********************************************************************************************/
-    function canRejectMetadataEdit(
-        address sender,
-        address token,
-        uint256 chainID,
-        uint256 editIndex
-    ) external view returns (bool) {
+    function canRejectMetadataEdit(address sender, address token, uint256 editIndex) external view returns (bool) {
         return sender == owner;
     }
 }

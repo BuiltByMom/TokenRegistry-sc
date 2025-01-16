@@ -1,31 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./interfaces/ITokenMetadataEdits.sol";
 import "./interfaces/ITokentroller.sol";
 import "./interfaces/ITokenMetadataRegistry.sol";
 import "./interfaces/ISharedTypes.sol";
+import "./interfaces/ITokenMetadataEdits.sol";
 
 contract TokenMetadataEdits is ITokenMetadataEdits {
-    // Storage
-    mapping(uint256 => mapping(address => mapping(uint256 => MetadataEditProposal))) public editsOnTokens;
-    mapping(uint256 => mapping(address => uint256)) public editCount;
-    mapping(uint256 => address[]) public tokensMetadataWithEdits;
+    // Mapping of token address => edit index => edit info
+    mapping(address => mapping(uint256 => MetadataEditProposal)) public edits;
 
-    // Governance
+    // Mapping of token address => number of edits
+    mapping(address => uint256) public editCount;
+
+    // Array of tokens that have pending edits
+    address[] public tokensWithEdits;
+
+    // Mapping to track if a token is in the tokensWithEdits array
+    mapping(address => bool) public hasEdits;
+
     address public tokentroller;
-    address public metadataRegistry;
+    address public immutable metadataRegistry;
 
     constructor(address _tokentroller, address _metadataRegistry) {
         tokentroller = _tokentroller;
         metadataRegistry = _metadataRegistry;
     }
 
-    function proposeMetadataEdit(address token, uint256 chainID, MetadataInput[] calldata updates) external {
+    function proposeMetadataEdit(address token, MetadataInput[] calldata updates) external {
         require(
-            ITokentroller(tokentroller).canProposeMetadataEdit(msg.sender, token, chainID, updates),
-            "Not authorized"
+            ITokentroller(tokentroller).canProposeMetadataEdit(msg.sender, token, updates),
+            "Not authorized to propose edit"
         );
+
         require(updates.length > 0, "No updates provided");
 
         // Validate all fields
@@ -33,147 +40,143 @@ contract TokenMetadataEdits is ITokenMetadataEdits {
             require(ITokenMetadataRegistry(metadataRegistry).isValidField(updates[i].field), "Invalid field");
         }
 
-        uint256 newIndex = ++editCount[chainID][token];
+        uint256 editIndex = editCount[token] + 1;
+        MetadataEditProposal storage newEdit = edits[token][editIndex];
+        newEdit.submitter = msg.sender;
+        newEdit.timestamp = block.timestamp;
 
-        // Add to tokensMetadataWithEdits if this is the first edit
-        if (newIndex == 1) {
-            tokensMetadataWithEdits[chainID].push(token);
-        }
-
-        // Store the edit proposal
-        MetadataEditProposal storage proposal = editsOnTokens[chainID][token][newIndex];
-        proposal.submitter = msg.sender;
-        proposal.chainID = chainID;
-        proposal.timestamp = block.timestamp;
-
-        // Store updates
         for (uint256 i = 0; i < updates.length; i++) {
-            proposal.updates.push(updates[i]);
+            newEdit.updates.push(updates[i]);
         }
 
-        emit MetadataEditProposed(token, chainID, msg.sender, updates);
-    }
+        editCount[token] = editIndex;
 
-    function acceptMetadataEdit(address token, uint256 chainID, uint256 editIndex) external {
-        require(
-            ITokentroller(tokentroller).canAcceptMetadataEdit(msg.sender, token, chainID, editIndex),
-            "Not authorized"
-        );
-        require(editIndex <= editCount[chainID][token], "Invalid edit index");
-        require(editCount[chainID][token] > 0, "No edit exists");
-
-        MetadataEditProposal storage edit = editsOnTokens[chainID][token][editIndex];
-
-        ITokenMetadataRegistry(metadataRegistry).updateMetadata(token, chainID, edit.updates);
-
-        // Clear all edits and remove from tracking
-        for (uint256 i = 1; i <= editCount[chainID][token]; i++) {
-            delete editsOnTokens[chainID][token][i];
+        if (!hasEdits[token]) {
+            tokensWithEdits.push(token);
+            hasEdits[token] = true;
         }
-        editCount[chainID][token] = 0;
 
-        _removeTokenFromEdits(chainID, token);
-
-        emit MetadataEditAccepted(token, editIndex, chainID);
+        emit MetadataEditProposed(token, msg.sender, updates);
     }
 
-    function rejectMetadataEdit(address token, uint256 chainID, uint256 editIndex, string calldata reason) external {
+    function acceptMetadataEdit(address token, uint256 editIndex) external {
         require(
-            ITokentroller(tokentroller).canRejectMetadataEdit(msg.sender, token, chainID, editIndex),
-            "Not authorized"
+            ITokentroller(tokentroller).canAcceptMetadataEdit(msg.sender, token, editIndex),
+            "Not authorized to accept edit"
         );
-        require(editIndex <= editCount[chainID][token], "Invalid edit index");
-        require(editCount[chainID][token] > 0, "No edit exists");
+        require(edits[token][editIndex].submitter != address(0), "Edit does not exist");
 
-        // Clear the rejected edit
-        delete editsOnTokens[chainID][token][editIndex];
-        editCount[chainID][token]--;
+        MetadataEditProposal storage edit = edits[token][editIndex];
+        ITokenMetadataRegistry(metadataRegistry).updateMetadata(token, edit.updates);
+
+        // Clear all edits for this token
+        _clearEdits(token);
+
+        emit MetadataEditAccepted(token, editIndex);
+    }
+
+    function rejectMetadataEdit(address token, uint256 editIndex, string calldata reason) external {
+        require(
+            ITokentroller(tokentroller).canRejectMetadataEdit(msg.sender, token, editIndex),
+            "Not authorized to reject edit"
+        );
+        require(edits[token][editIndex].submitter != address(0), "Edit does not exist");
+
+        // Clear the specific edit
+        delete edits[token][editIndex];
 
         // If no more edits, remove from tracking
-        if (editCount[chainID][token] == 0) {
-            _removeTokenFromEdits(chainID, token);
-        }
-
-        emit MetadataEditRejected(token, editIndex, chainID, reason);
-    }
-
-    function listAllEdits(
-        uint256 chainID,
-        uint256 initialIndex,
-        uint256 size
-    ) external view returns (MetadataEditInfo[] memory edits, uint256 finalIndex, bool hasMore) {
-        require(size > 0, "Size must be greater than zero");
-
-        // Count total edits
-        uint256 totalEdits = 0;
-        for (uint256 i = 0; i < tokensMetadataWithEdits[chainID].length; i++) {
-            totalEdits += editCount[chainID][tokensMetadataWithEdits[chainID][i]];
-        }
-
-        if (totalEdits == 0 || initialIndex >= totalEdits) {
-            return (new MetadataEditInfo[](0), 0, false);
-        }
-
-        uint256 arraySize = size > (totalEdits - initialIndex) ? (totalEdits - initialIndex) : size;
-        edits = new MetadataEditInfo[](arraySize);
-
-        uint256 found;
-        uint256 editCounter;
-
-        for (uint256 i = 0; i < tokensMetadataWithEdits[chainID].length && found < arraySize; i++) {
-            address tokenAddr = tokensMetadataWithEdits[chainID][i];
-            uint256 tokenEditCount = editCount[chainID][tokenAddr];
-
-            for (uint256 j = 1; j <= tokenEditCount && found < arraySize; j++) {
-                if (editCounter >= initialIndex) {
-                    MetadataEditProposal storage proposal = editsOnTokens[chainID][tokenAddr][j];
-                    if (proposal.submitter != address(0)) {
-                        edits[found] = MetadataEditInfo({
-                            token: tokenAddr,
-                            submitter: proposal.submitter,
-                            updates: proposal.updates,
-                            chainID: proposal.chainID,
-                            editIndex: j,
-                            timestamp: proposal.timestamp
-                        });
-                        found++;
-                        finalIndex = editCounter;
-                    }
-                }
-                editCounter++;
+        if (editIndex == editCount[token]) {
+            editCount[token]--;
+            if (editCount[token] == 0) {
+                _removeFromTokensWithEdits(token);
             }
         }
 
-        hasMore = (totalEdits - initialIndex) > size;
+        emit MetadataEditRejected(token, editIndex, reason);
     }
 
-    function tokensMetadataWithEditsLength(uint256 chainID) external view returns (uint256) {
-        return tokensMetadataWithEdits[chainID].length;
+    function listAllEdits(
+        uint256 initialIndex,
+        uint256 size
+    ) external view returns (MetadataEditInfo[] memory edits_, uint256 finalIndex, bool hasMore) {
+        uint256 totalEdits = 0;
+        for (uint256 i = 0; i < tokensWithEdits.length; i++) {
+            totalEdits += editCount[tokensWithEdits[i]];
+        }
+
+        if (initialIndex >= totalEdits) {
+            return (new MetadataEditInfo[](0), initialIndex, false);
+        }
+
+        uint256 remaining = totalEdits - initialIndex;
+        uint256 count = remaining < size ? remaining : size;
+        edits_ = new MetadataEditInfo[](count);
+
+        uint256 found = 0;
+        uint256 currentIndex = 0;
+
+        for (uint256 i = 0; i < tokensWithEdits.length && found < count; i++) {
+            address token = tokensWithEdits[i];
+            uint256 tokenEditCount = editCount[token];
+
+            for (uint256 j = 1; j <= tokenEditCount && found < count; j++) {
+                if (currentIndex >= initialIndex) {
+                    MetadataEditProposal storage edit = edits[token][j];
+                    if (edit.submitter != address(0)) {
+                        edits_[found] = MetadataEditInfo({
+                            token: token,
+                            submitter: edit.submitter,
+                            updates: edit.updates,
+                            editIndex: j,
+                            timestamp: edit.timestamp
+                        });
+                        found++;
+                    }
+                }
+                currentIndex++;
+            }
+        }
+
+        finalIndex = initialIndex + found;
+        hasMore = finalIndex < totalEdits;
     }
 
-    function getTokensMetadataWithEdits(uint256 chainID, uint256 index) external view returns (address) {
-        return tokensMetadataWithEdits[chainID][index];
+    function tokensMetadataWithEditsLength() external view returns (uint256) {
+        return tokensWithEdits.length;
     }
 
-    function getEditCount(uint256 chainID, address token) external view returns (uint256) {
-        return editCount[chainID][token];
+    function getTokensMetadataWithEdits(uint256 index) external view returns (address) {
+        require(index < tokensWithEdits.length, "Index out of bounds");
+        return tokensWithEdits[index];
     }
 
-    function getEditProposal(
-        uint256 chainID,
-        address token,
-        uint256 editIndex
-    ) external view returns (MetadataEditProposal memory) {
-        return editsOnTokens[chainID][token][editIndex];
+    function getEditCount(address token) external view returns (uint256) {
+        return editCount[token];
     }
 
-    function _removeTokenFromEdits(uint256 chainID, address token) internal {
-        address[] storage edits = tokensMetadataWithEdits[chainID];
-        for (uint256 i = 0; i < edits.length; i++) {
-            if (edits[i] == token) {
-                edits[i] = edits[edits.length - 1];
-                edits.pop();
-                break;
+    function getEditProposal(address token, uint256 editIndex) external view returns (MetadataEditProposal memory) {
+        return edits[token][editIndex];
+    }
+
+    function _clearEdits(address token) internal {
+        uint256 count = editCount[token];
+        for (uint256 i = 1; i <= count; i++) {
+            delete edits[token][i];
+        }
+        editCount[token] = 0;
+        _removeFromTokensWithEdits(token);
+    }
+
+    function _removeFromTokensWithEdits(address token) internal {
+        if (hasEdits[token]) {
+            hasEdits[token] = false;
+            for (uint256 i = 0; i < tokensWithEdits.length; i++) {
+                if (tokensWithEdits[i] == token) {
+                    tokensWithEdits[i] = tokensWithEdits[tokensWithEdits.length - 1];
+                    tokensWithEdits.pop();
+                    break;
+                }
             }
         }
     }

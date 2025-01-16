@@ -13,7 +13,6 @@ contract UploadTokensBatchScript is Script {
         string symbol;
         string logoURI;
         uint8 decimals;
-        uint256 chainId;
     }
 
     function run(uint256 startIndex, uint256 batchSize) public {
@@ -59,22 +58,13 @@ contract UploadTokensBatchScript is Script {
         // Process batch
         for (uint256 i = startIndex; i < startIndex + actualBatchSize; i++) {
             try this.parseToken(json, i) returns (Token memory token) {
-                try
-                    registry.addToken(
-                        token.address_,
-                        token.name,
-                        token.symbol,
-                        token.logoURI,
-                        token.decimals,
-                        token.chainId
-                    )
-                {
+                try registry.addToken(token.address_, token.name, token.symbol, token.logoURI, token.decimals) {
                     successCount++;
                     console.log("Added token: %s (%s)", token.name, token.symbol);
 
                     // Approve every third token
                     if (i % 3 == 0) {
-                        try registry.approveToken(token.chainId, token.address_) {
+                        try registry.approveToken(token.address_) {
                             approvedCount++;
                             console.log("Approved token: %s", token.symbol);
                         } catch Error(string memory reason) {
@@ -114,8 +104,7 @@ contract UploadTokensBatchScript is Script {
                 name: vm.parseJsonString(json, string.concat(prefix, ".name")),
                 symbol: vm.parseJsonString(json, string.concat(prefix, ".symbol")),
                 logoURI: vm.parseJsonString(json, string.concat(prefix, ".logoURI")),
-                decimals: uint8(vm.parseJsonUint(json, string.concat(prefix, ".decimals"))),
-                chainId: vm.parseJsonUint(json, string.concat(prefix, ".chainId"))
+                decimals: uint8(vm.parseJsonUint(json, string.concat(prefix, ".decimals")))
             });
     }
 }

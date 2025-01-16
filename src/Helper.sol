@@ -21,7 +21,6 @@ contract Helper is IHelper {
     }
 
     function addTokenWithMetadata(
-        uint256 chainID,
         address contractAddress,
         string memory name,
         string memory symbol,
@@ -30,10 +29,10 @@ contract Helper is IHelper {
         MetadataInput[] calldata metadata
     ) public {
         // First add the token using existing logic
-        ITokenRegistry(tokenRegistry).addToken(chainID, contractAddress, name, symbol, logoURI, decimals);
+        ITokenRegistry(tokenRegistry).addToken(contractAddress, name, symbol, logoURI, decimals);
 
         // Then set the metadata using the state variable
-        ITokenMetadataRegistry(metadataRegistry).setMetadataBatch(contractAddress, chainID, metadata);
+        ITokenMetadataRegistry(metadataRegistry).setMetadataBatch(contractAddress, metadata);
     }
 
     function proposeEditWithMetadata(
@@ -42,13 +41,12 @@ contract Helper is IHelper {
         string memory symbol,
         string memory logoURI,
         uint8 decimals,
-        uint256 chainID,
         MetadataInput[] calldata metadataUpdates
     ) external {
         // First propose the token edit
-        ITokenEdits(tokenEdits).proposeEdit(contractAddress, name, symbol, logoURI, decimals, chainID);
+        ITokenEdits(tokenEdits).proposeEdit(contractAddress, name, symbol, logoURI, decimals);
 
         // Then propose the metadata edit
-        ITokenMetadataEdits(metadataEdits).proposeMetadataEdit(contractAddress, chainID, metadataUpdates);
+        ITokenMetadataEdits(metadataEdits).proposeMetadataEdit(contractAddress, metadataUpdates);
     }
 }

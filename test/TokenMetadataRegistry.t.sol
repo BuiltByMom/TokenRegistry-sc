@@ -14,7 +14,6 @@ contract TokenMetadataRegistryTest is Test {
     address owner = address(1);
     address nonOwner = address(2);
     address tokenAddress = address(3);
-    uint256 chainID = 1;
 
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
@@ -67,7 +66,7 @@ contract TokenMetadataRegistryTest is Test {
     function testSetMetadata() public {
         // First add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // First add the field
         vm.prank(owner);
@@ -75,26 +74,26 @@ contract TokenMetadataRegistryTest is Test {
 
         // Then set the metadata
         vm.prank(nonOwner);
-        metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
+        metadataRegistry.setMetadata(tokenAddress, "website", "https://example.com");
 
-        string memory value = metadataRegistry.getMetadata(tokenAddress, chainID, "website");
+        string memory value = metadataRegistry.getMetadata(tokenAddress, "website");
         assertEq(value, "https://example.com");
     }
 
     function testCannotSetInvalidField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
 
         vm.prank(nonOwner);
         vm.expectRevert("Invalid field");
-        metadataRegistry.setMetadata(tokenAddress, chainID, "nonexistent", "test");
+        metadataRegistry.setMetadata(tokenAddress, "nonexistent", "test");
     }
 
     function testCannotSetInactiveField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // Add and then deactivate the field
         vm.prank(owner);
@@ -105,7 +104,7 @@ contract TokenMetadataRegistryTest is Test {
 
         vm.prank(nonOwner);
         vm.expectRevert("Invalid field");
-        metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
+        metadataRegistry.setMetadata(tokenAddress, "website", "https://example.com");
     }
 
     function testUpdateTokentroller() public {
@@ -125,7 +124,7 @@ contract TokenMetadataRegistryTest is Test {
     function testGetAllMetadata() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // First add the fields
         vm.prank(owner);
@@ -135,15 +134,12 @@ contract TokenMetadataRegistryTest is Test {
 
         // Set some metadata
         vm.prank(nonOwner);
-        metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
+        metadataRegistry.setMetadata(tokenAddress, "website", "https://example.com");
         vm.prank(nonOwner);
-        metadataRegistry.setMetadata(tokenAddress, chainID, "twitter", "@example");
+        metadataRegistry.setMetadata(tokenAddress, "twitter", "@example");
 
         // Get all metadata
-        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(
-            tokenAddress,
-            chainID
-        );
+        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(tokenAddress);
 
         // Verify the results
         assertEq(allMetadata.length, 2);
@@ -161,7 +157,7 @@ contract TokenMetadataRegistryTest is Test {
     function testGetAllMetadataWithInactiveField() public {
         // Add a pending token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // Add and set fields
         vm.prank(owner);
@@ -170,19 +166,16 @@ contract TokenMetadataRegistryTest is Test {
         metadataRegistry.addMetadataField("twitter");
 
         vm.prank(nonOwner);
-        metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://example.com");
+        metadataRegistry.setMetadata(tokenAddress, "website", "https://example.com");
         vm.prank(nonOwner);
-        metadataRegistry.setMetadata(tokenAddress, chainID, "twitter", "@example");
+        metadataRegistry.setMetadata(tokenAddress, "twitter", "@example");
 
         // Deactivate one field
         vm.prank(owner);
         metadataRegistry.updateMetadataField("twitter", false);
 
         // Get all metadata
-        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(
-            tokenAddress,
-            chainID
-        );
+        TokenMetadataRegistry.MetadataValue[] memory allMetadata = metadataRegistry.getAllMetadata(tokenAddress);
 
         // Values should still be present but field marked as inactive
         assertEq(allMetadata.length, 2);
@@ -200,7 +193,7 @@ contract TokenMetadataRegistryTest is Test {
 
         // Add token
         vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token", "TEST", "logo", 18);
+        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18);
 
         // Prepare batch metadata
         MetadataInput[] memory inputs = new MetadataInput[](2);
@@ -209,35 +202,11 @@ contract TokenMetadataRegistryTest is Test {
 
         // Set batch metadata
         vm.prank(nonOwner);
-        metadataRegistry.setMetadataBatch(tokenAddress, chainID, inputs);
+        metadataRegistry.setMetadataBatch(tokenAddress, inputs);
 
         // Verify values
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "website"), "https://example.com");
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "twitter"), "@example");
-    }
-
-    function testMetadataAcrossChains() public {
-        // Add field first
-        vm.prank(owner);
-        metadataRegistry.addMetadataField("website");
-
-        uint256 chainID2 = 2;
-
-        // Add same token address on different chains
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID, tokenAddress, "Test Token Chain 1", "TEST1", "logo1", 18);
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(chainID2, tokenAddress, "Test Token Chain 2", "TEST2", "logo2", 18);
-
-        // Set different metadata for each chain
-        vm.prank(nonOwner);
-        metadataRegistry.setMetadata(tokenAddress, chainID, "website", "https://chain1.com");
-        vm.prank(nonOwner);
-        metadataRegistry.setMetadata(tokenAddress, chainID2, "website", "https://chain2.com");
-
-        // Verify metadata is separate for each chain
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "website"), "https://chain1.com");
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID2, "website"), "https://chain2.com");
+        assertEq(metadataRegistry.getMetadata(tokenAddress, "website"), "https://example.com");
+        assertEq(metadataRegistry.getMetadata(tokenAddress, "twitter"), "@example");
     }
 
     function testIsValidField() public {
