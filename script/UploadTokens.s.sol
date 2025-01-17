@@ -17,7 +17,9 @@ contract UploadTokensScript is Script {
         uint256 gasLimit = 500000;
 
         // Add tokens
-        registry.addToken{ gas: gasLimit }(address(0x123), "https://example.com/logo.png");
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        registry.addToken{ gas: gasLimit }(address(0x123), metadata);
 
         vm.stopBroadcast();
     }

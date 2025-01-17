@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./ISharedTypes.sol";
 
-interface ITokenMetadataRegistry {
+interface ITokenMetadata {
     struct EditParams {
         uint256 initialIndex;
         uint256 size;
@@ -12,7 +12,7 @@ interface ITokenMetadataRegistry {
     struct MetadataField {
         string name;
         bool isActive;
-        uint256 updatedAt;
+        bool isRequired;
     }
 
     struct MetadataValue {
@@ -31,10 +31,8 @@ interface ITokenMetadataRegistry {
     event MetadataEditAccepted(address indexed token, uint256 indexed editIndex);
     event MetadataEditRejected(address indexed token, uint256 indexed editIndex, string reason);
 
-    function addMetadataField(string calldata name) external;
-    function updateMetadataField(string calldata name, bool isActive) external;
-    function setMetadata(address token, string calldata field, string calldata value) external;
-    function setMetadataBatch(address token, MetadataInput[] calldata metadata) external;
+    function addField(string calldata name) external;
+    function updateField(string calldata name, bool isActive) external;
     function getMetadata(address token, string calldata field) external view returns (string memory);
     function getMetadataFields() external view returns (MetadataField[] memory);
     function getAllMetadata(address token) external view returns (MetadataValue[] memory);

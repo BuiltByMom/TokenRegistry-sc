@@ -3,15 +3,13 @@ pragma solidity ^0.8.0;
 import "./interfaces/ITokentroller.sol";
 import "./interfaces/ITokenRegistry.sol";
 import "./TokenRegistry.sol";
-import "./TokenMetadataRegistry.sol";
+import "./TokenMetadata.sol";
 import "./TokenEdits.sol";
-import "./TokenMetadataEdits.sol";
 
 contract TokentrollerV1 is ITokentroller {
     address public tokenRegistry;
     address public tokenEdits;
-    address public metadataRegistry;
-    address public metadataEdits;
+    address public tokenMetadata;
     address public owner;
 
     /**********************************************************************************************
@@ -20,10 +18,9 @@ contract TokentrollerV1 is ITokentroller {
      *********************************************************************************************/
     constructor(address _owner) {
         owner = _owner;
-        tokenRegistry = address(new TokenRegistry(address(this)));
-        tokenEdits = address(new TokenEdits(address(this), tokenRegistry));
-        metadataRegistry = address(new TokenMetadataRegistry(address(this)));
-        metadataEdits = address(new TokenMetadataEdits(address(this), metadataRegistry));
+        tokenMetadata = address(new TokenMetadata(address(this)));
+        tokenRegistry = address(new TokenRegistry(address(this), tokenMetadata));
+        tokenEdits = address(new TokenEdits(address(this), tokenMetadata));
     }
 
     /**********************************************************************************************
@@ -53,17 +50,17 @@ contract TokentrollerV1 is ITokentroller {
     }
 
     /**********************************************************************************************
-     * @dev Updates the tokentroller address in the TokenMetadataRegistry contract
+     * @dev Updates the tokentroller address in the TokenMetadata contract
      * @param newTokentroller The address of the new tokentroller
      * @notice This function can only be called by the owner
      * @notice The new tokentroller address must not be zero or the current contract address
-     * @notice Calls the updateTokentroller function in the TokenRegistry contract
+     * @notice Calls the updateTokentroller function in the TokenMetadata contract
      *********************************************************************************************/
-    function updateMetadataRegistryTokentroller(address newTokentroller) public {
+    function updateMetadataTokentroller(address newTokentroller) public {
         require(msg.sender == owner, "Only the owner can call this function");
         require(newTokentroller != address(0), "New tokentroller address cannot be zero");
         require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
-        TokenMetadataRegistry(metadataRegistry).updateTokentroller(newTokentroller);
+        TokenMetadata(tokenMetadata).updateTokentroller(newTokentroller);
     }
 
     /**********************************************************************************************
@@ -192,7 +189,7 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a metadata field can be added
      * @param sender The address of the sender
      * @param name The name of the metadata field
-     * @notice This function is called by the TokenRegistry contract
+     * @notice This function is called by the TokenMetadata contract
      * @notice It should implement any necessary checks before allowing metadata field addition
      * @return bool Returns true if the metadata field can be added, false otherwise
      *********************************************************************************************/
@@ -226,12 +223,8 @@ contract TokentrollerV1 is ITokentroller {
         TokenRegistry registry = TokenRegistry(tokenRegistry);
         TokenStatus status = registry.tokenStatus(token);
 
-        if (status == TokenStatus.APPROVED || status == TokenStatus.REJECTED) {
-            return false;
-        }
-        if (status == TokenStatus.PENDING || status == TokenStatus.NONE) {
-            return true;
-        }
+        // Only allow setting metadata for pending or new tokens
+        return status == TokenStatus.PENDING || status == TokenStatus.NONE;
     }
 
     /**********************************************************************************************
@@ -239,7 +232,7 @@ contract TokentrollerV1 is ITokentroller {
      * @param sender The address of the sender
      * @param token The address of the token
      * @param updates The array of MetadataInput structs
-     * @notice This function is called by the TokenMetadataRegistry contract
+     * @notice This function is called by the TokenMetadata contract
      * @notice This function verifies that the token is approved
      * @return bool Returns true if the metadata edit can be proposed, false otherwise
      *********************************************************************************************/
@@ -261,7 +254,7 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
     function canUpdateMetadata(address sender, address contractAddress) public view returns (bool) {
-        return sender == metadataEdits;
+        return sender == tokenRegistry || sender == tokenEdits;
     }
 
     /**********************************************************************************************
@@ -269,7 +262,7 @@ contract TokentrollerV1 is ITokentroller {
      * @param sender The address of the sender
      * @param token The address of the token
      * @param editIndex The index of the edit to be accepted
-     * @notice This function is called by the TokenMetadataRegistry contract
+     * @notice This function is called by the TokenMetadata contract
      * @notice This function verifies that the sender is the owner
      * @return bool Returns true if the metadata edit can be accepted, false otherwise
      *********************************************************************************************/
@@ -282,7 +275,7 @@ contract TokentrollerV1 is ITokentroller {
      * @param sender The address of the sender
      * @param token The address of the token
      * @param editIndex The index of the edit to be rejected
-     * @notice This function is called by the TokenMetadataRegistry contract
+     * @notice This function is called by the TokenMetadata contract
      * @notice This function verifies that the sender is the owner
      * @return bool Returns true if the metadata edit can be rejected, false otherwise
      *********************************************************************************************/

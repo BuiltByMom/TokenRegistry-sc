@@ -5,20 +5,23 @@ import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./interfaces/ITokenRegistry.sol";
 import "./interfaces/ITokentroller.sol";
+import "./interfaces/ITokenMetadata.sol";
+import "./interfaces/ISharedTypes.sol";
 
 contract TokenRegistry is ITokenRegistry {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     mapping(TokenStatus => EnumerableSet.AddressSet) private tokensByStatus;
-    mapping(address => string) public tokenLogoURIs;
+    ITokenMetadata public tokenMetadata;
 
     address public tokentroller;
 
-    constructor(address _tokentroller) {
+    constructor(address _tokentroller, address _tokenMetadata) {
         tokentroller = _tokentroller;
+        tokenMetadata = ITokenMetadata(_tokenMetadata);
     }
 
-    function addToken(address contractAddress, string calldata logoURI) external {
+    function addToken(address contractAddress, MetadataInput[] calldata metadata) external {
         require(ITokentroller(tokentroller).canAddToken(msg.sender, contractAddress), "Not authorized to add token");
 
         // Verify it's a valid ERC20 token
@@ -38,18 +41,10 @@ contract TokenRegistry is ITokenRegistry {
             tokensByStatus[TokenStatus.REJECTED].remove(contractAddress);
         }
 
-        tokenLogoURIs[contractAddress] = logoURI;
+        tokenMetadata.updateMetadata(contractAddress, metadata);
         tokensByStatus[TokenStatus.PENDING].add(contractAddress);
 
         emit TokenAdded(contractAddress, msg.sender);
-    }
-
-    function updateToken(address contractAddress, string calldata logoURI) external {
-        require(ITokentroller(tokentroller).canUpdateToken(msg.sender, contractAddress), "Not authorized");
-
-        tokenLogoURIs[contractAddress] = logoURI;
-
-        emit TokenUpdated(contractAddress, logoURI);
     }
 
     function _getToken(address contractAddress) internal view returns (Token memory) {
@@ -59,7 +54,7 @@ contract TokenRegistry is ITokenRegistry {
                 name: IERC20Metadata(contractAddress).name(),
                 symbol: IERC20Metadata(contractAddress).symbol(),
                 decimals: IERC20Metadata(contractAddress).decimals(),
-                logoURI: tokenLogoURIs[contractAddress]
+                logoURI: tokenMetadata.getMetadata(contractAddress, "logoURI")
             });
     }
 

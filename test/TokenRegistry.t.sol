@@ -26,24 +26,30 @@ contract TokenRegistryTest is Test {
 
     function testAddToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "https://example.com/logo.png");
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
 
-        assertEq(tokenRegistry.tokenLogoURIs(address(mockToken)), "https://example.com/logo.png");
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
     }
 
     function testApproveToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "https://example.com/logo.png");
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         vm.prank(owner);
         tokenRegistry.approveToken(address(mockToken));
 
-        assertEq(tokenRegistry.tokenLogoURIs(address(mockToken)), "https://example.com/logo.png");
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
     }
 
     function testRejectToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "https://example.com/logo.png");
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         string memory reason = "Token does not meet listing criteria";
         vm.expectEmit(true, true, false, true);
@@ -52,7 +58,7 @@ contract TokenRegistryTest is Test {
         vm.prank(owner);
         tokenRegistry.rejectToken(address(mockToken), reason);
 
-        assertEq(tokenRegistry.tokenLogoURIs(address(mockToken)), "https://example.com/logo.png");
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
     }
 
     function testUpdateTokentroller() public {
@@ -64,6 +70,9 @@ contract TokenRegistryTest is Test {
     }
 
     function testlistTokens() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
         for (uint256 i = 0; i < 5; i++) {
             MockERC20 token = new MockERC20(
                 string.concat("Token ", uintToStr(i)),
@@ -71,7 +80,7 @@ contract TokenRegistryTest is Test {
                 18
             );
             vm.prank(nonOwner);
-            tokenRegistry.addToken(address(token), "https://example.com/logo.png");
+            tokenRegistry.addToken(address(token), metadata);
         }
 
         (ITokenRegistry.Token[] memory tokens, uint256 total) = tokenRegistry.listTokens(0, 3, TokenStatus.PENDING);
@@ -84,6 +93,9 @@ contract TokenRegistryTest is Test {
     }
 
     function testlistTokensWithDifferentStatuses() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
         MockERC20[] memory mockTokens = new MockERC20[](5);
         for (uint256 i = 0; i < 5; i++) {
             mockTokens[i] = new MockERC20(
@@ -92,7 +104,7 @@ contract TokenRegistryTest is Test {
                 18
             );
             vm.prank(nonOwner);
-            tokenRegistry.addToken(address(mockTokens[i]), "https://example.com/logo.png");
+            tokenRegistry.addToken(address(mockTokens[i]), metadata);
 
             if (i % 2 == 0) {
                 vm.prank(owner);
@@ -113,6 +125,9 @@ contract TokenRegistryTest is Test {
     }
 
     function testTokenCount() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
         for (uint256 i = 0; i < 5; i++) {
             MockERC20 token = new MockERC20(
                 string.concat("Token ", uintToStr(i)),
@@ -120,7 +135,7 @@ contract TokenRegistryTest is Test {
                 18
             );
             vm.prank(nonOwner);
-            tokenRegistry.addToken(address(token), "https://example.com/logo.png");
+            tokenRegistry.addToken(address(token), metadata);
         }
 
         (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts();
@@ -165,8 +180,11 @@ contract TokenRegistryTest is Test {
 
         // Add a token
         MockERC20 token1 = new MockERC20("Token 1", "TKN1", 18);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo1.png" });
+
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(token1), "https://example.com/logo1.png");
+        tokenRegistry.addToken(address(token1), metadata);
         (pending, approved, rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 1);
         assertEq(approved, 0);
@@ -174,8 +192,11 @@ contract TokenRegistryTest is Test {
 
         // Add another token to test rejection
         MockERC20 token2 = new MockERC20("Token 2", "TKN2", 18);
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
+
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(token2), "https://example.com/logo2.png");
+        tokenRegistry.addToken(address(token2), metadata2);
 
         // Fast track the first token
         vm.prank(owner);
@@ -215,6 +236,8 @@ contract TokenRegistryTest is Test {
 
     function testPaginationWithStatusFilters() public {
         // Create and add 10 tokens
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
         MockERC20[] memory tokens = new MockERC20[](10);
         for (uint256 i = 0; i < 10; i++) {
             tokens[i] = new MockERC20(
@@ -222,7 +245,7 @@ contract TokenRegistryTest is Test {
                 string.concat("TKN", uintToString(i + 1)),
                 18
             );
-            tokenRegistry.addToken(address(tokens[i]), "https://example.com/logo.png");
+            tokenRegistry.addToken(address(tokens[i]), metadata);
         }
 
         // Approve tokens 3, 4, 5
@@ -280,6 +303,10 @@ contract TokenRegistryTest is Test {
 
     function testMixedStatusPagination() public {
         MockERC20[] memory mockTokens = new MockERC20[](10);
+
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
         for (uint256 i = 0; i < 10; i++) {
             mockTokens[i] = new MockERC20(
                 string.concat("Token ", uintToStr(i)),
@@ -287,7 +314,7 @@ contract TokenRegistryTest is Test {
                 18
             );
             vm.prank(nonOwner);
-            tokenRegistry.addToken(address(mockTokens[i]), "https://example.com/logo.png");
+            tokenRegistry.addToken(address(mockTokens[i]), metadata);
 
             if (i % 3 == 0) {
                 vm.prank(owner);
@@ -321,27 +348,31 @@ contract TokenRegistryTest is Test {
     }
 
     function testResubmitRejectedToken() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "https://example.com/logo.png");
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         // Reject the token
         vm.prank(owner);
         tokenRegistry.rejectToken(address(mockToken), "Test reason");
 
         // Verify token is rejected
-        assertEq(tokenRegistry.tokenLogoURIs(address(mockToken)), "https://example.com/logo.png");
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
         (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 0);
         assertEq(approved, 0);
         assertEq(rejected, 1);
 
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
         // Resubmit the token with updated information
         vm.prank(nonOwner2);
-        tokenRegistry.addToken(address(mockToken), "https://example.com/logo2.png");
+        tokenRegistry.addToken(address(mockToken), metadata2);
 
         // Verify token is now pending and rejected state is cleaned up
-        assertEq(tokenRegistry.tokenLogoURIs(address(mockToken)), "https://example.com/logo2.png");
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo2.png");
         (pending, approved, rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 1);
         assertEq(approved, 0);
@@ -353,17 +384,22 @@ contract TokenRegistryTest is Test {
     }
 
     function testResubmitRejectedTokenCannotBypassApproval() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "logo");
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         // Reject the token
         vm.prank(owner);
         tokenRegistry.rejectToken(address(mockToken), "Test reason");
 
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
+
         // Resubmit and try to fast-track without proper authorization
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "logo2");
+        tokenRegistry.addToken(address(mockToken), metadata2);
 
         vm.prank(nonOwner);
         vm.expectRevert("Not authorized to approve token");
@@ -373,26 +409,35 @@ contract TokenRegistryTest is Test {
     function testCannotResubmitPendingToken() public {
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "logo");
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
+
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
 
         // Try to resubmit while still pending
         vm.prank(nonOwner);
         vm.expectRevert("Token already exists in pending or approved state");
-        tokenRegistry.addToken(address(mockToken), "logo2");
+        tokenRegistry.addToken(address(mockToken), metadata2);
     }
 
     function testCannotResubmitApprovedToken() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(mockToken), "logo");
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         // Approve the token
         vm.prank(owner);
         tokenRegistry.approveToken(address(mockToken));
 
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
         // Try to resubmit while approved
         vm.prank(nonOwner);
         vm.expectRevert("Token already exists in pending or approved state");
-        tokenRegistry.addToken(address(mockToken), "logo2");
+        tokenRegistry.addToken(address(mockToken), metadata2);
     }
 }
