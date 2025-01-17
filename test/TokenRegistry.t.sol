@@ -473,32 +473,88 @@ contract TokenRegistryTest is Test {
         vm.stopPrank();
 
         // Get token with metadata
-        ITokenRegistry.TokenWithMetadata memory tokenWithMetadata = tokenRegistry.getTokenWithMetadata(
-            address(mockToken)
-        );
+        ITokenRegistry.Token memory token = tokenRegistry.getToken(address(mockToken), true);
 
         // Verify token data
-        assertEq(tokenWithMetadata.token.contractAddress, address(mockToken));
-        assertEq(tokenWithMetadata.token.name, "Test Token");
-        assertEq(tokenWithMetadata.token.symbol, "TEST");
-        assertEq(tokenWithMetadata.token.decimals, 18);
+        assertEq(token.contractAddress, address(mockToken));
+        assertEq(token.name, "Test Token");
+        assertEq(token.symbol, "TEST");
+        assertEq(token.decimals, 18);
 
         // Verify metadata
-        assertEq(tokenWithMetadata.metadata.length, 3);
+        assertEq(token.metadata.length, 3);
 
         // Verify logoURI field
-        assertEq(tokenWithMetadata.metadata[0].field, "logoURI");
-        assertEq(tokenWithMetadata.metadata[0].value, "https://example.com/logo.png");
-        assertTrue(tokenWithMetadata.metadata[0].isActive);
+        assertEq(token.metadata[0].field, "logoURI");
+        assertEq(token.metadata[0].value, "https://example.com/logo.png");
+        assertTrue(token.metadata[0].isActive);
 
         // Verify website field
-        assertEq(tokenWithMetadata.metadata[1].field, "website");
-        assertEq(tokenWithMetadata.metadata[1].value, "https://example.com");
-        assertTrue(tokenWithMetadata.metadata[1].isActive);
+        assertEq(token.metadata[1].field, "website");
+        assertEq(token.metadata[1].value, "https://example.com");
+        assertTrue(token.metadata[1].isActive);
 
         // Verify twitter field
-        assertEq(tokenWithMetadata.metadata[2].field, "twitter");
-        assertEq(tokenWithMetadata.metadata[2].value, "@example");
-        assertTrue(tokenWithMetadata.metadata[2].isActive);
+        assertEq(token.metadata[2].field, "twitter");
+        assertEq(token.metadata[2].value, "@example");
+        assertTrue(token.metadata[2].isActive);
+    }
+
+    function testGetTokens() public {
+        // Create and add multiple tokens
+        MockERC20 mockToken2 = new MockERC20("Test Token 2", "TEST2", 6);
+        MockERC20 mockToken3 = new MockERC20("Test Token 3", "TEST3", 8);
+
+        vm.startPrank(nonOwner);
+
+        // Add first token
+        MetadataInput[] memory metadata1 = new MetadataInput[](1);
+        metadata1[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo1.png" });
+        tokenRegistry.addToken(address(mockToken), metadata1);
+
+        // Add second token
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
+        tokenRegistry.addToken(address(mockToken2), metadata2);
+
+        // Add third token
+        MetadataInput[] memory metadata3 = new MetadataInput[](1);
+        metadata3[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo3.png" });
+        tokenRegistry.addToken(address(mockToken3), metadata3);
+
+        vm.stopPrank();
+
+        // Create array of addresses to query
+        address[] memory addresses = new address[](3);
+        addresses[0] = address(mockToken);
+        addresses[1] = address(mockToken2);
+        addresses[2] = address(mockToken3);
+
+        // Get tokens
+        ITokenRegistry.Token[] memory tokens = tokenRegistry.getTokens(addresses);
+
+        // Verify length
+        assertEq(tokens.length, 3);
+
+        // Verify first token
+        assertEq(tokens[0].contractAddress, address(mockToken));
+        assertEq(tokens[0].name, "Test Token");
+        assertEq(tokens[0].symbol, "TEST");
+        assertEq(tokens[0].decimals, 18);
+        assertEq(tokens[0].logoURI, "https://example.com/logo1.png");
+
+        // Verify second token
+        assertEq(tokens[1].contractAddress, address(mockToken2));
+        assertEq(tokens[1].name, "Test Token 2");
+        assertEq(tokens[1].symbol, "TEST2");
+        assertEq(tokens[1].decimals, 6);
+        assertEq(tokens[1].logoURI, "https://example.com/logo2.png");
+
+        // Verify third token
+        assertEq(tokens[2].contractAddress, address(mockToken3));
+        assertEq(tokens[2].name, "Test Token 3");
+        assertEq(tokens[2].symbol, "TEST3");
+        assertEq(tokens[2].decimals, 8);
+        assertEq(tokens[2].logoURI, "https://example.com/logo3.png");
     }
 }

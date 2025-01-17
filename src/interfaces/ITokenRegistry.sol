@@ -10,11 +10,8 @@ interface ITokenRegistry {
         string symbol; // Read from ERC20
         uint8 decimals; // Read from ERC20
         string logoURI;
-    }
-
-    struct TokenWithMetadata {
-        Token token;
-        MetadataValue[] metadata;
+        TokenStatus status;
+        MetadataValue[] metadata; // Optional metadata
     }
 
     event TokenAdded(address indexed contractAddress, address indexed submitter);
@@ -26,12 +23,24 @@ interface ITokenRegistry {
     function approveToken(address contractAddress) external;
     function rejectToken(address contractAddress, string calldata reason) external;
     function getToken(address contractAddress) external view returns (Token memory);
-    function getTokenWithMetadata(address tokenAddress) external view returns (TokenWithMetadata memory);
+    function getToken(address contractAddress, bool includeMetadata) external view returns (Token memory);
+    function getTokens(address[] calldata contractAddresses) external view returns (Token[] memory);
+    function getTokens(
+        address[] calldata contractAddresses,
+        bool includeMetadata
+    ) external view returns (Token[] memory);
     function listTokens(
         uint256 offset,
         uint256 limit,
         TokenStatus status
     ) external view returns (Token[] memory tokens, uint256 total);
+    function listTokens(
+        uint256 offset,
+        uint256 limit,
+        TokenStatus status,
+        bool includeMetadata
+    ) external view returns (Token[] memory tokens, uint256 total);
     function getTokenCounts() external view returns (uint256 pending, uint256 approved, uint256 rejected);
     function updateTokentroller(address newTokentroller) external;
+    function tokenStatus(address contractAddress) external view returns (TokenStatus);
 }

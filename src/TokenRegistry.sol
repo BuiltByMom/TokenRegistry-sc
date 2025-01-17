@@ -47,26 +47,55 @@ contract TokenRegistry is ITokenRegistry {
         emit TokenAdded(contractAddress, msg.sender);
     }
 
-    function _getToken(address contractAddress) internal view returns (Token memory) {
-        return
-            Token({
-                contractAddress: contractAddress,
-                name: IERC20Metadata(contractAddress).name(),
-                symbol: IERC20Metadata(contractAddress).symbol(),
-                decimals: IERC20Metadata(contractAddress).decimals(),
-                logoURI: tokenMetadata.getMetadata(contractAddress, "logoURI")
-            });
+    function _getToken(address contractAddress, bool includeMetadata) internal view returns (Token memory) {
+        Token memory token = Token({
+            contractAddress: contractAddress,
+            name: IERC20Metadata(contractAddress).name(),
+            symbol: IERC20Metadata(contractAddress).symbol(),
+            decimals: IERC20Metadata(contractAddress).decimals(),
+            logoURI: tokenMetadata.getMetadata(contractAddress, "logoURI"),
+            status: tokenStatus(contractAddress),
+            metadata: includeMetadata ? tokenMetadata.getAllMetadata(contractAddress) : new MetadataValue[](0)
+        });
+        return token;
+    }
+
+    function _getTokens(
+        address[] calldata contractAddresses,
+        bool includeMetadata
+    ) internal view returns (Token[] memory) {
+        Token[] memory tokens = new Token[](contractAddresses.length);
+        for (uint256 i = 0; i < contractAddresses.length; i++) {
+            tokens[i] = _getToken(contractAddresses[i], includeMetadata);
+        }
+        return tokens;
     }
 
     function getToken(address contractAddress) external view returns (Token memory) {
-        return _getToken(contractAddress);
+        return _getToken(contractAddress, false);
     }
 
-    function listTokens(
+    function getToken(address contractAddress, bool includeMetadata) external view returns (Token memory) {
+        return _getToken(contractAddress, includeMetadata);
+    }
+
+    function getTokens(address[] calldata contractAddresses) external view returns (Token[] memory) {
+        return _getTokens(contractAddresses, false);
+    }
+
+    function getTokens(
+        address[] calldata contractAddresses,
+        bool includeMetadata
+    ) external view returns (Token[] memory) {
+        return _getTokens(contractAddresses, includeMetadata);
+    }
+
+    function _listTokens(
         uint256 offset,
         uint256 limit,
-        TokenStatus status
-    ) external view returns (Token[] memory tokens, uint256 total) {
+        TokenStatus status,
+        bool includeMetadata
+    ) internal view returns (Token[] memory tokens, uint256 total) {
         EnumerableSet.AddressSet storage statusSet = tokensByStatus[status];
         total = statusSet.length();
 
@@ -83,11 +112,28 @@ contract TokenRegistry is ITokenRegistry {
 
         for (uint256 i = 0; i < resultLength; i++) {
             address tokenAddress = statusSet.at(offset + i);
-            tokens[i] = _getToken(tokenAddress);
+            tokens[i] = _getToken(tokenAddress, includeMetadata);
         }
     }
 
-    function tokenStatus(address contractAddress) external view returns (TokenStatus) {
+    function listTokens(
+        uint256 offset,
+        uint256 limit,
+        TokenStatus status
+    ) external view returns (Token[] memory tokens, uint256 total) {
+        return _listTokens(offset, limit, status, false);
+    }
+
+    function listTokens(
+        uint256 offset,
+        uint256 limit,
+        TokenStatus status,
+        bool includeMetadata
+    ) external view returns (Token[] memory tokens, uint256 total) {
+        return _listTokens(offset, limit, status, includeMetadata);
+    }
+
+    function tokenStatus(address contractAddress) public view returns (TokenStatus) {
         if (tokensByStatus[TokenStatus.APPROVED].contains(contractAddress)) {
             return TokenStatus.APPROVED;
         } else if (tokensByStatus[TokenStatus.PENDING].contains(contractAddress)) {
@@ -136,11 +182,5 @@ contract TokenRegistry is ITokenRegistry {
         pending = tokensByStatus[TokenStatus.PENDING].length();
         approved = tokensByStatus[TokenStatus.APPROVED].length();
         rejected = tokensByStatus[TokenStatus.REJECTED].length();
-    }
-
-    function getTokenWithMetadata(address tokenAddress) external view returns (TokenWithMetadata memory) {
-        Token memory token = _getToken(tokenAddress);
-        MetadataValue[] memory metadata = tokenMetadata.getAllMetadata(tokenAddress);
-        return TokenWithMetadata({ token: token, metadata: metadata });
     }
 }
