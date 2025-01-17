@@ -6,6 +6,12 @@ struct MetadataInput {
     string value;
 }
 
+struct MetadataValue {
+    string field;
+    string value;
+    bool isActive;
+}
+
 enum TokenStatus {
     PENDING,
     APPROVED,

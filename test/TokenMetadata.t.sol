@@ -139,7 +139,7 @@ contract TokenMetadataTest is Test {
         tokenMetadata.updateMetadata(address(token), metadata2);
 
         // Get all metadata
-        ITokenMetadata.MetadataValue[] memory allMetadata = tokenMetadata.getAllMetadata(address(token));
+        MetadataValue[] memory allMetadata = tokenMetadata.getAllMetadata(address(token));
 
         // Verify the results
         assertEq(allMetadata.length, 3);
@@ -183,7 +183,7 @@ contract TokenMetadataTest is Test {
         tokenMetadata.updateField("twitter", false);
 
         // Get all metadata
-        ITokenMetadata.MetadataValue[] memory allMetadata = tokenMetadata.getAllMetadata(address(token));
+        MetadataValue[] memory allMetadata = tokenMetadata.getAllMetadata(address(token));
 
         // Values should still be present but field marked as inactive
         assertEq(allMetadata.length, 3);

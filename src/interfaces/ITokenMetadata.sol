@@ -15,12 +15,6 @@ interface ITokenMetadata {
         bool isRequired;
     }
 
-    struct MetadataValue {
-        string field;
-        string value;
-        bool isActive;
-    }
-
     event MetadataFieldAdded(string name);
     event MetadataFieldUpdated(string name, bool isActive);
     event MetadataValueSet(address indexed token, string field, string value);

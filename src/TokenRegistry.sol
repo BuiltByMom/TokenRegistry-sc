@@ -137,4 +137,10 @@ contract TokenRegistry is ITokenRegistry {
         approved = tokensByStatus[TokenStatus.APPROVED].length();
         rejected = tokensByStatus[TokenStatus.REJECTED].length();
     }
+
+    function getTokenWithMetadata(address tokenAddress) external view returns (TokenWithMetadata memory) {
+        Token memory token = _getToken(tokenAddress);
+        MetadataValue[] memory metadata = tokenMetadata.getAllMetadata(tokenAddress);
+        return TokenWithMetadata({ token: token, metadata: metadata });
+    }
 }

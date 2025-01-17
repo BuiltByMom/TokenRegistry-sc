@@ -11,6 +11,8 @@ import "test/MockERC20.sol";
 contract TokenRegistryTest is Test {
     TokenRegistry tokenRegistry;
     TokentrollerV1 tokentroller;
+    TokenMetadata tokenMetadata;
+    TokenEdits tokenEdits;
     address owner = address(1);
     address nonOwner = address(2);
     address nonOwner2 = address(3);
@@ -21,6 +23,8 @@ contract TokenRegistryTest is Test {
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
         tokenRegistry = TokenRegistry(tokentroller.tokenRegistry());
+        tokenMetadata = TokenMetadata(tokentroller.tokenMetadata());
+        tokenEdits = TokenEdits(tokentroller.tokenEdits());
         mockToken = new MockERC20("Test Token", "TEST", 18);
     }
 
@@ -439,5 +443,62 @@ contract TokenRegistryTest is Test {
         vm.prank(nonOwner);
         vm.expectRevert("Token already exists in pending or approved state");
         tokenRegistry.addToken(address(mockToken), metadata2);
+    }
+
+    function testGetTokenWithMetadata() public {
+        // Add a token with metadata
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
+        vm.stopPrank();
+
+        // Add additional metadata fields
+        vm.startPrank(owner);
+        tokenRegistry.approveToken(address(mockToken));
+        tokenMetadata.addField("website");
+        tokenMetadata.addField("twitter");
+        vm.stopPrank();
+
+        // Set additional metadata
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory additionalMetadata = new MetadataInput[](2);
+        additionalMetadata[0] = MetadataInput({ field: "website", value: "https://example.com" });
+        additionalMetadata[1] = MetadataInput({ field: "twitter", value: "@example" });
+        tokenEdits.proposeEdit(address(mockToken), additionalMetadata);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        tokenEdits.acceptEdit(address(mockToken), 1);
+        vm.stopPrank();
+
+        // Get token with metadata
+        ITokenRegistry.TokenWithMetadata memory tokenWithMetadata = tokenRegistry.getTokenWithMetadata(
+            address(mockToken)
+        );
+
+        // Verify token data
+        assertEq(tokenWithMetadata.token.contractAddress, address(mockToken));
+        assertEq(tokenWithMetadata.token.name, "Test Token");
+        assertEq(tokenWithMetadata.token.symbol, "TEST");
+        assertEq(tokenWithMetadata.token.decimals, 18);
+
+        // Verify metadata
+        assertEq(tokenWithMetadata.metadata.length, 3);
+
+        // Verify logoURI field
+        assertEq(tokenWithMetadata.metadata[0].field, "logoURI");
+        assertEq(tokenWithMetadata.metadata[0].value, "https://example.com/logo.png");
+        assertTrue(tokenWithMetadata.metadata[0].isActive);
+
+        // Verify website field
+        assertEq(tokenWithMetadata.metadata[1].field, "website");
+        assertEq(tokenWithMetadata.metadata[1].value, "https://example.com");
+        assertTrue(tokenWithMetadata.metadata[1].isActive);
+
+        // Verify twitter field
+        assertEq(tokenWithMetadata.metadata[2].field, "twitter");
+        assertEq(tokenWithMetadata.metadata[2].value, "@example");
+        assertTrue(tokenWithMetadata.metadata[2].isActive);
     }
 }

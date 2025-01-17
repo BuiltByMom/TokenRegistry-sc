@@ -12,6 +12,11 @@ interface ITokenRegistry {
         string logoURI;
     }
 
+    struct TokenWithMetadata {
+        Token token;
+        MetadataValue[] metadata;
+    }
+
     event TokenAdded(address indexed contractAddress, address indexed submitter);
     event TokenApproved(address indexed contractAddress);
     event TokenRejected(address indexed contractAddress, string reason);
@@ -21,6 +26,7 @@ interface ITokenRegistry {
     function approveToken(address contractAddress) external;
     function rejectToken(address contractAddress, string calldata reason) external;
     function getToken(address contractAddress) external view returns (Token memory);
+    function getTokenWithMetadata(address tokenAddress) external view returns (TokenWithMetadata memory);
     function listTokens(
         uint256 offset,
         uint256 limit,
