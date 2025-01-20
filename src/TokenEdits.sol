@@ -7,13 +7,23 @@ import "./interfaces/ISharedTypes.sol";
 import "./interfaces/ITokenEdits.sol";
 import "./interfaces/ITokenMetadata.sol";
 import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableMap.sol";
+import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
 contract TokenEdits is ITokenEdits {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
+    using EnumerableSet for EnumerableSet.UintSet;
 
-    // Storage for edits - maps token address => edit index => metadata array
+    // Sequential ID for edits
+    uint256 private nextEditId;
+
+    // Token => edit ID => metadata
     mapping(address => mapping(uint256 => MetadataInput[])) public edits;
-    EnumerableMap.AddressToUintMap private tokensWithEdits; // token address => edit count
+
+    // Token => set of active edit IDs
+    mapping(address => EnumerableSet.UintSet) private tokenActiveEdits;
+
+    // Token => number of active edits (for EnumerableMap compatibility)
+    EnumerableMap.AddressToUintMap private tokensWithEdits;
 
     // Governance
     address public tokentroller;
@@ -30,68 +40,63 @@ contract TokenEdits is ITokenEdits {
             "Not authorized to propose edit"
         );
 
-        (, uint256 currentEditCount) = tokensWithEdits.tryGet(contractAddress);
-        currentEditCount++;
-
-        MetadataInput[] storage editArray = edits[contractAddress][currentEditCount];
+        uint256 editId = ++nextEditId;
+        MetadataInput[] storage editArray = edits[contractAddress][editId];
         for (uint256 i = 0; i < metadata.length; i++) {
-            editArray.push(MetadataInput({ field: metadata[i].field, value: metadata[i].value }));
+            editArray.push(metadata[i]);
         }
 
-        tokensWithEdits.set(contractAddress, currentEditCount);
+        EnumerableSet.add(tokenActiveEdits[contractAddress], editId);
+        (, uint256 currentCount) = tokensWithEdits.tryGet(contractAddress);
+        tokensWithEdits.set(contractAddress, currentCount + 1);
 
         emit EditProposed(contractAddress, msg.sender, metadata);
     }
 
-    function acceptEdit(address contractAddress, uint256 editIndex) external {
+    function acceptEdit(address contractAddress, uint256 editId) external {
         require(
-            ITokentroller(tokentroller).canAcceptTokenEdit(msg.sender, contractAddress, editIndex),
+            ITokentroller(tokentroller).canAcceptTokenEdit(msg.sender, contractAddress, editId),
             "Not authorized to accept edit"
         );
 
-        (bool exists, uint256 currentEditCount) = tokensWithEdits.tryGet(contractAddress);
-        require(exists, "No edits exist");
-        require(editIndex <= currentEditCount, "Invalid edit index");
+        require(EnumerableSet.contains(tokenActiveEdits[contractAddress], editId), "Edit not found");
 
-        MetadataInput[] memory metadata = edits[contractAddress][editIndex];
+        MetadataInput[] memory metadata = edits[contractAddress][editId];
         require(metadata.length > 0, "Edit does not exist");
 
         ITokenMetadata(tokenMetadata).updateMetadata(contractAddress, metadata);
 
-        // Clear all edits and remove from tracking
-        for (uint256 i = 1; i <= currentEditCount; i++) {
-            delete edits[contractAddress][i];
+        // Clear all edits for this token
+        uint256[] memory activeIds = EnumerableSet.values(tokenActiveEdits[contractAddress]);
+        for (uint256 i = 0; i < activeIds.length; i++) {
+            uint256 id = activeIds[i];
+            delete edits[contractAddress][id];
+            EnumerableSet.remove(tokenActiveEdits[contractAddress], id);
         }
         tokensWithEdits.remove(contractAddress);
 
-        emit EditAccepted(contractAddress, editIndex);
+        emit EditAccepted(contractAddress, editId);
     }
 
-    function rejectEdit(address contractAddress, uint256 editIndex, string calldata reason) external {
+    function rejectEdit(address contractAddress, uint256 editId, string calldata reason) external {
         require(
-            ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, contractAddress, editIndex),
+            ITokentroller(tokentroller).canRejectTokenEdit(msg.sender, contractAddress, editId),
             "Not authorized to reject edit"
         );
 
-        (bool exists, uint256 currentEditCount) = tokensWithEdits.tryGet(contractAddress);
-        require(exists, "No edits exist");
-        require(editIndex <= currentEditCount, "Invalid edit index");
+        require(EnumerableSet.contains(tokenActiveEdits[contractAddress], editId), "Edit not found");
 
-        MetadataInput[] memory metadata = edits[contractAddress][editIndex];
-        require(metadata.length > 0, "Edit does not exist");
+        delete edits[contractAddress][editId];
+        EnumerableSet.remove(tokenActiveEdits[contractAddress], editId);
 
-        delete edits[contractAddress][editIndex];
-
-        // If this was the last edit, remove token from tracking
-        if (editIndex == currentEditCount) {
-            if (currentEditCount == 1) {
-                tokensWithEdits.remove(contractAddress);
-            } else {
-                tokensWithEdits.set(contractAddress, currentEditCount - 1);
-            }
+        (, uint256 currentCount) = tokensWithEdits.tryGet(contractAddress);
+        if (currentCount == 1) {
+            tokensWithEdits.remove(contractAddress);
+        } else {
+            tokensWithEdits.set(contractAddress, currentCount - 1);
         }
 
-        emit EditRejected(contractAddress, editIndex, reason);
+        emit EditRejected(contractAddress, editId, reason);
     }
 
     function getTokensWithEditsCount() external view returns (uint256) {
@@ -99,26 +104,26 @@ contract TokenEdits is ITokenEdits {
     }
 
     function getTokenEdits(address token) external view returns (MetadataInput[][] memory) {
-        uint256 count = getEditCount(token);
-        MetadataInput[][] memory result = new MetadataInput[][](count);
-        for (uint256 i = 0; i < count; i++) {
-            result[i] = edits[token][i + 1];
+        uint256[] memory activeIds = EnumerableSet.values(tokenActiveEdits[token]);
+        MetadataInput[][] memory result = new MetadataInput[][](activeIds.length);
+
+        for (uint256 i = 0; i < activeIds.length; i++) {
+            result[i] = edits[token][activeIds[i]];
         }
         return result;
     }
 
     function getEditCount(address token) public view returns (uint256) {
-        (, uint256 count) = tokensWithEdits.tryGet(token);
-        return count;
+        return EnumerableSet.length(tokenActiveEdits[token]);
     }
 
     function listEdits(
         uint256 initialIndex,
         uint256 size
-    ) external view returns (MetadataInput[][] memory metadataEdits, uint256 total) {
+    ) external view returns (TokenEdit[] memory tokenEdits, uint256 total) {
         uint256 totalTokens = tokensWithEdits.length();
         if (initialIndex >= totalTokens) {
-            return (new MetadataInput[][](0), totalTokens);
+            return (new TokenEdit[](0), totalTokens);
         }
 
         uint256 endIndex = initialIndex + size;
@@ -126,11 +131,18 @@ contract TokenEdits is ITokenEdits {
             endIndex = totalTokens;
         }
 
-        MetadataInput[][] memory result = new MetadataInput[][](endIndex - initialIndex);
+        TokenEdit[] memory result = new TokenEdit[](endIndex - initialIndex);
         for (uint256 i = initialIndex; i < endIndex; i++) {
-            (address token, uint256 editCount) = tokensWithEdits.at(i);
-            MetadataInput[] memory tokenEdits = edits[token][editCount];
-            result[i - initialIndex] = tokenEdits;
+            (address token, ) = tokensWithEdits.at(i);
+
+            uint256[] memory activeIds = EnumerableSet.values(tokenActiveEdits[token]);
+            MetadataInput[][] memory tokenUpdates = new MetadataInput[][](activeIds.length);
+
+            for (uint256 j = 0; j < activeIds.length; j++) {
+                tokenUpdates[j] = edits[token][activeIds[j]];
+            }
+
+            result[i - initialIndex] = TokenEdit({ token: token, updates: tokenUpdates });
         }
 
         return (result, totalTokens);

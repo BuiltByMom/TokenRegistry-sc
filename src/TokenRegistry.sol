@@ -164,10 +164,9 @@ contract TokenRegistry is ITokenRegistry {
             ITokentroller(tokentroller).canRejectToken(msg.sender, contractAddress),
             "Not authorized to reject token"
         );
+        require(tokenStatus(contractAddress) != TokenStatus.REJECTED, "Token already rejected");
 
-        require(tokensByStatus[TokenStatus.PENDING].contains(contractAddress), "Token not found in pending state");
-
-        tokensByStatus[TokenStatus.PENDING].remove(contractAddress);
+        tokensByStatus[tokenStatus(contractAddress)].remove(contractAddress);
         tokensByStatus[TokenStatus.REJECTED].add(contractAddress);
 
         emit TokenRejected(contractAddress, reason);

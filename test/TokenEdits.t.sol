@@ -6,8 +6,8 @@ import "forge-std/console.sol";
 import "src/TokenEdits.sol";
 import "src/TokenRegistry.sol";
 import "src/TokentrollerV1.sol";
-import "src/interfaces/ITokenRegistry.sol";
 import "test/MockERC20.sol";
+import "src/interfaces/ITokenEdits.sol";
 
 contract TokenEditsTest is Test {
     TokenEdits tokenEdits;
@@ -131,6 +131,57 @@ contract TokenEditsTest is Test {
         assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be 0");
     }
 
+    function testRejectMultipleEdits() public {
+        // Add and approve token
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(token), metadata);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        tokenRegistry.approveToken(address(token));
+        vm.stopPrank();
+
+        // Create edit
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/new_logo1.png" });
+        tokenEdits.proposeEdit(address(token), metadata2);
+        vm.stopPrank();
+
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata3 = new MetadataInput[](1);
+        metadata3[0] = MetadataInput({ field: "logoURI", value: "https://example.com/new_logo2.png" });
+        tokenEdits.proposeEdit(address(token), metadata3);
+        vm.stopPrank();
+
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata4 = new MetadataInput[](1);
+        metadata4[0] = MetadataInput({ field: "logoURI", value: "https://example.com/new_logo3.png" });
+        tokenEdits.proposeEdit(address(token), metadata4);
+        vm.stopPrank();
+
+        assertEq(tokenEdits.getEditCount(address(token)), 3, "Edit count should be 3");
+
+        // Reject the edit
+        vm.startPrank(owner);
+        tokenEdits.rejectEdit(address(token), 1, "Invalid logo");
+        vm.stopPrank();
+
+        assertEq(tokenEdits.getEditCount(address(token)), 2, "Edit count after rejection should be 2");
+
+        vm.startPrank(owner);
+        tokenEdits.rejectEdit(address(token), 2, "Invalid logo");
+        tokenEdits.rejectEdit(address(token), 3, "Invalid logo");
+        vm.stopPrank();
+
+        // Verify edit was cleared
+        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
+        assertEq(storedEdits.length, 0, "Edit should be cleared");
+        assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be 0");
+    }
+
     function testCannotRejectEditWithoutPermission() public {
         // Add and approve token
         vm.startPrank(nonOwner);
@@ -191,6 +242,50 @@ contract TokenEditsTest is Test {
         assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be reset");
     }
 
+    function testAcceptAfterReject() public {
+        // Add and approve token
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(token), metadata);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        tokenRegistry.approveToken(address(token));
+        vm.stopPrank();
+
+        // Create multiple edits
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo1.png" });
+        tokenEdits.proposeEdit(address(token), metadata2);
+
+        MetadataInput[] memory metadata3 = new MetadataInput[](1);
+        metadata3[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
+        tokenEdits.proposeEdit(address(token), metadata3);
+        vm.stopPrank();
+
+        MetadataInput[] memory metadata4 = new MetadataInput[](1);
+        metadata4[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo3.png" });
+        tokenEdits.proposeEdit(address(token), metadata4);
+        vm.stopPrank();
+
+        // Reject first edit
+        vm.startPrank(owner);
+        tokenEdits.rejectEdit(address(token), 1, "Invalid logo");
+        vm.stopPrank();
+
+        // Accept third edit
+        vm.startPrank(owner);
+        tokenEdits.acceptEdit(address(token), 3);
+        vm.stopPrank();
+
+        // Verify all edits were cleared
+        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
+        assertEq(storedEdits.length, 0, "All edits should be cleared");
+        assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be reset");
+    }
+
     function testEditTracking() public {
         // Add and approve a token first
         vm.prank(nonOwner);
@@ -240,21 +335,29 @@ contract TokenEditsTest is Test {
         MetadataInput[] memory metadata2 = new MetadataInput[](1);
         metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo1.png" });
         tokenEdits.proposeEdit(address(token), metadata2);
+
         vm.prank(nonOwner2);
         MetadataInput[] memory metadata3 = new MetadataInput[](1);
         metadata3[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
         tokenEdits.proposeEdit(address(token), metadata3);
 
         // Test listing with pagination
-        (MetadataInput[][] memory metadataEdits, uint256 total) = tokenEdits.listEdits(0, 1);
+        (ITokenEdits.TokenEdit[] memory edits, uint256 total) = tokenEdits.listEdits(0, 1);
 
-        assertEq(metadataEdits.length, 1);
-        assertEq(metadataEdits[0][0].value, "https://example.com/logo2.png"); // Latest edit
+        // Verify basic structure
+        assertEq(edits.length, 1);
+        assertEq(edits[0].updates.length, 2); // Should have both edits
         assertEq(total, 1); // One token with edits
 
+        // Verify edit contents in chronological order
+        assertEq(edits[0].updates[0][0].field, "logoURI");
+        assertEq(edits[0].updates[0][0].value, "https://example.com/logo1.png"); // First edit
+        assertEq(edits[0].updates[1][0].field, "logoURI");
+        assertEq(edits[0].updates[1][0].value, "https://example.com/logo2.png"); // Second edit
+
         // Get second page (should be empty)
-        (MetadataInput[][] memory metadataEdits2, uint256 total2) = tokenEdits.listEdits(1, 1);
-        assertEq(metadataEdits2.length, 0);
+        (ITokenEdits.TokenEdit[] memory edits2, uint256 total2) = tokenEdits.listEdits(1, 1);
+        assertEq(edits2.length, 0);
         assertEq(total2, 1);
     }
 }

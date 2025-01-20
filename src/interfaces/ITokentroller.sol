@@ -19,7 +19,12 @@ interface ITokentroller {
     function canRejectTokenEdit(address sender, address token, uint256 editIndex) external view returns (bool);
 
     function canAddMetadataField(address sender, string calldata name) external view returns (bool);
-    function canUpdateMetadataField(address sender, string calldata name, bool isActive) external view returns (bool);
+    function canUpdateMetadataField(
+        address sender,
+        string calldata name,
+        bool isActive,
+        bool isRequired
+    ) external view returns (bool);
     function canSetMetadata(address sender, address token, string calldata field) external view returns (bool);
 
     function canUpdateMetadata(address sender, address token) external view returns (bool);

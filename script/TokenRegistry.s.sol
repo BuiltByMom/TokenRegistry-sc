@@ -19,11 +19,11 @@ contract DeployTokenRegistry is Script {
         // The TokenRegistry and TokenMetadata are automatically deployed by the TokentrollerV1 constructor
         address tokenRegistryAddress = tokentroller.tokenRegistry();
         address tokenMetadataAddress = tokentroller.tokenMetadata();
-
+        address tokenEditsAddress = tokentroller.tokenEdits();
         console.log("TokentrollerV1 deployed at:", address(tokentroller));
         console.log("TokenRegistry deployed at:", tokenRegistryAddress);
         console.log("TokenMetadata deployed at:", tokenMetadataAddress);
-
+        console.log("TokenEdits deployed at:", tokenEditsAddress);
         vm.stopBroadcast();
     }
 }
