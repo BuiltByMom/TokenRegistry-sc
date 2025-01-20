@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
 import "./interfaces/ITokentroller.sol";
 import "./interfaces/ITokenRegistry.sol";
 import "./TokenRegistry.sol";
@@ -159,12 +160,12 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a token edit can be accepted
      * @param sender The address of the sender
      * @param contractAddress The address of the token for which the edit is proposed
-     * @param editIndex The index of the edit to be accepted
+     * @param editId The id of the edit to be accepted
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing edit acceptance
      * @return bool Returns true if the edit can be accepted, false otherwise
      *********************************************************************************************/
-    function canAcceptTokenEdit(address sender, address contractAddress, uint256 editIndex) public view returns (bool) {
+    function canAcceptTokenEdit(address sender, address contractAddress, uint256 editId) public view returns (bool) {
         return sender == owner;
     }
 
@@ -202,11 +203,17 @@ contract TokentrollerV1 is ITokentroller {
      * @param _sender The address of the sender
      * @param name The name of the metadata field
      * @param isActive The status of the metadata field
+     * @param isRequired The required status of the metadata field
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing metadata field updates
      * @return bool Returns true if the metadata field can be updated, false otherwise
      *********************************************************************************************/
-    function canUpdateMetadataField(address sender, string calldata name, bool isActive) external view returns (bool) {
+    function canUpdateMetadataField(
+        address sender,
+        string calldata name,
+        bool isActive,
+        bool isRequired
+    ) external view returns (bool) {
         return sender == owner;
     }
 

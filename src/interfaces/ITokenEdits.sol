@@ -4,6 +4,11 @@ pragma solidity ^0.8.0;
 import "./ISharedTypes.sol";
 
 interface ITokenEdits {
+    struct TokenEdit {
+        address token;
+        MetadataInput[][] updates;
+    }
+
     event EditProposed(address indexed contractAddress, address indexed submitter, MetadataInput[] metadata);
     event EditAccepted(address indexed contractAddress, uint256 editIndex);
     event EditRejected(address indexed contractAddress, uint256 editIndex, string reason);
@@ -17,6 +22,6 @@ interface ITokenEdits {
     function listEdits(
         uint256 initialIndex,
         uint256 size
-    ) external view returns (MetadataInput[][] memory metadataEdits, uint256 total);
+    ) external view returns (TokenEdit[] memory tokenEdits, uint256 total);
     function updateTokentroller(address newTokentroller) external;
 }

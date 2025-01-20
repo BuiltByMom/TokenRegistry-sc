@@ -31,6 +31,15 @@ contract TokenMetadata is ITokenMetadata {
         nameToId[name] = fieldId + 1; // Use 1-based IDs so 0 means "not found"
     }
 
+    function addField(string calldata name, bool isRequired) external {
+        require(
+            ITokentroller(tokentroller).canAddMetadataField(msg.sender, name),
+            "Not authorized to add metadata field"
+        );
+        _addField(name, isRequired);
+        emit MetadataFieldAdded(name);
+    }
+
     function addField(string calldata name) external {
         require(
             ITokentroller(tokentroller).canAddMetadataField(msg.sender, name),
@@ -40,9 +49,9 @@ contract TokenMetadata is ITokenMetadata {
         emit MetadataFieldAdded(name);
     }
 
-    function updateField(string calldata name, bool isActive) external {
+    function updateField(string calldata name, bool isActive, bool isRequired) external {
         require(
-            ITokentroller(tokentroller).canUpdateMetadataField(msg.sender, name, isActive),
+            ITokentroller(tokentroller).canUpdateMetadataField(msg.sender, name, isActive, isRequired),
             "Not authorized to update metadata field"
         );
 
@@ -51,7 +60,8 @@ contract TokenMetadata is ITokenMetadata {
         uint256 index = fieldId - 1;
 
         metadataFields[index].isActive = isActive;
-        emit MetadataFieldUpdated(name, isActive);
+        metadataFields[index].isRequired = isRequired;
+        emit MetadataFieldUpdated(name, isActive, isRequired);
     }
 
     function _setMetadataField(address token, string calldata field, string calldata value) private returns (uint256) {
@@ -101,10 +111,10 @@ contract TokenMetadata is ITokenMetadata {
         return values;
     }
 
-    function isValidField(string memory field) public view returns (bool) {
+    function getField(string calldata field) public view returns (MetadataField memory) {
         uint256 fieldId = nameToId[field];
-        if (fieldId == 0) return false;
-        return metadataFields[fieldId - 1].isActive;
+        if (fieldId == 0) return MetadataField("", false, false);
+        return metadataFields[fieldId - 1];
     }
 
     function updateTokentroller(address newTokentroller) external {

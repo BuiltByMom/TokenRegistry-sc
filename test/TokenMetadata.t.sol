@@ -53,7 +53,7 @@ contract TokenMetadataTest is Test {
         tokenMetadata.addField("website");
 
         vm.prank(owner);
-        tokenMetadata.updateField("website", false);
+        tokenMetadata.updateField("website", false, false);
 
         ITokenMetadata.MetadataField[] memory fields = tokenMetadata.getMetadataFields();
         assertEq(fields[1].isActive, false);
@@ -62,7 +62,7 @@ contract TokenMetadataTest is Test {
     function testCannotUpdateNonexistentField() public {
         vm.prank(owner);
         vm.expectRevert("Field does not exist");
-        tokenMetadata.updateField("nonexistent", false);
+        tokenMetadata.updateField("nonexistent", false, false);
     }
 
     function testCannotSetInvalidField() public {
@@ -92,7 +92,7 @@ contract TokenMetadataTest is Test {
         // Add and then deactivate the field
         vm.startPrank(owner);
         tokenMetadata.addField("website");
-        tokenMetadata.updateField("website", false);
+        tokenMetadata.updateField("website", false, false);
         vm.stopPrank();
 
         MetadataInput[] memory metadata2 = new MetadataInput[](1);
@@ -180,7 +180,7 @@ contract TokenMetadataTest is Test {
 
         // Deactivate one field
         vm.prank(owner);
-        tokenMetadata.updateField("twitter", false);
+        tokenMetadata.updateField("twitter", false, false);
 
         // Get all metadata
         MetadataValue[] memory allMetadata = tokenMetadata.getAllMetadata(address(token));
@@ -193,18 +193,20 @@ contract TokenMetadataTest is Test {
         assertEq(allMetadata[2].value, "@example");
     }
 
-    function testIsValidField() public {
+    function testGetField() public {
         // Test non-existent field
-        assertFalse(tokenMetadata.isValidField("nonexistent"));
+        assertFalse(tokenMetadata.getField("nonexistent").isActive);
 
         // Add a field and test
         vm.prank(owner);
-        tokenMetadata.addField("website");
-        assertTrue(tokenMetadata.isValidField("website"));
+        tokenMetadata.addField("website", true);
+        assertTrue(tokenMetadata.getField("website").isActive);
+        assertTrue(tokenMetadata.getField("website").isRequired);
 
         // Deactivate field and test
         vm.prank(owner);
-        tokenMetadata.updateField("website", false);
-        assertFalse(tokenMetadata.isValidField("website"));
+        tokenMetadata.updateField("website", false, false);
+        assertFalse(tokenMetadata.getField("website").isActive);
+        assertFalse(tokenMetadata.getField("website").isRequired);
     }
 }
