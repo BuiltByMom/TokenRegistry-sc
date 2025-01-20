@@ -6,162 +6,63 @@ import "forge-std/console.sol";
 import "src/TokenRegistry.sol";
 import "src/TokentrollerV1.sol";
 import "src/interfaces/ITokenRegistry.sol";
-
+import "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "test/MockERC20.sol";
 contract TokenRegistryTest is Test {
     TokenRegistry tokenRegistry;
     TokentrollerV1 tokentroller;
-    TokenMetadataRegistry metadataRegistry;
+    TokenMetadata tokenMetadata;
+    TokenEdits tokenEdits;
     address owner = address(1);
     address nonOwner = address(2);
     address nonOwner2 = address(3);
-    address tokenAddress = address(4);
-    uint256 chainID = 1;
+    MockERC20 mockToken;
 
-    event TokenRejected(address indexed contractAddress, uint256 indexed chainID, string reason);
+    event TokenRejected(address indexed contractAddress, string reason);
 
     function setUp() public {
         tokentroller = new TokentrollerV1(owner);
         tokenRegistry = TokenRegistry(tokentroller.tokenRegistry());
-        metadataRegistry = TokenMetadataRegistry(tokentroller.metadataRegistry());
+        tokenMetadata = TokenMetadata(tokentroller.tokenMetadata());
+        tokenEdits = TokenEdits(tokentroller.tokenEdits());
+        mockToken = new MockERC20("Test Token", "TEST", 18);
     }
 
     function testAddToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
 
-        (
-            address contractAddress,
-            address submitter,
-            string memory name,
-            string memory logoURI,
-            string memory symbol,
-            uint8 decimals,
-            uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 0);
-
-        assertEq(name, "Test Token");
-        assertEq(symbol, "TTK");
-        assertEq(logoURI, "https://example.com/logo.png");
-        assertEq(decimals, 18);
-        assertEq(chainID, chainID);
-    }
-
-    function testUpdateToken() public {
-        // First add and approve the token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-
-        // Fast track the token to approved status
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Now update the approved token
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
-
-        // Check that the edit is stored in editsOnTokens, not directly updated
-        (
-            address contractAddress,
-            address submitter,
-            string memory name,
-            string memory logoURI,
-            string memory symbol,
-            uint8 decimals,
-            uint256 chainId
-        ) = tokenRegistry.editsOnTokens(chainID, tokenAddress, 1);
-
-        assertEq(name, "Updated Token", "Name should be in edit");
-        assertEq(symbol, "UTK", "Symbol should be in edit");
-        assertEq(logoURI, "https://example.com/new_logo.png", "Logo URI should be in edit");
-        assertEq(decimals, 9, "Decimals should be in edit");
-    }
-
-    function testCannotUpdateNonApprovedToken() public {
-        // Add token but don't approve it
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-
-        // Try to update pending token
-        vm.prank(nonOwner);
-        vm.expectRevert("Token does not exist");
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
-    }
-
-    function testCannotUpdateRejectedToken() public {
-        // Add and reject the token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-
-        vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress, "Test reason");
-
-        // Try to update rejected token
-        vm.prank(nonOwner);
-        vm.expectRevert("Token does not exist");
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
     }
 
     function testApproveToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(address(mockToken));
 
-        (
-            address contractAddress,
-            address submitter,
-            string memory name,
-            string memory logoURI,
-            string memory symbol,
-            uint8 decimals,
-            uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 1);
-        assertEq(name, "Test Token", "Token should be fast-tracked");
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
     }
 
     function testRejectToken() public {
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         string memory reason = "Token does not meet listing criteria";
         vm.expectEmit(true, true, false, true);
-        emit TokenRejected(tokenAddress, chainID, reason);
+        emit TokenRejected(address(mockToken), reason);
 
         vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress, reason);
+        tokenRegistry.rejectToken(address(mockToken), reason);
 
-        (
-            address contractAddress,
-            address submitter,
-            string memory name,
-            string memory logoURI,
-            string memory symbol,
-            uint8 decimals,
-            uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 2);
-        assertEq(name, "Test Token", "Token should be rejected");
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
     }
 
     function testUpdateTokentroller() public {
@@ -172,120 +73,77 @@ contract TokenRegistryTest is Test {
         assertEq(tokenRegistry.tokentroller(), newTokentroller);
     }
 
-    function testListAllTokens() public {
+    function testlistTokens() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
         for (uint256 i = 0; i < 5; i++) {
-            vm.prank(nonOwner);
-            tokenRegistry.addToken(
-                address(uint160(i + 10)),
-                string(abi.encodePacked("Token ", uintToStr(i))),
-                string(abi.encodePacked("TK", uintToStr(i))),
-                "https://example.com/logo.png",
-                18,
-                chainID
+            MockERC20 token = new MockERC20(
+                string.concat("Token ", uintToStr(i)),
+                string.concat("TKN", uintToStr(i)),
+                18
             );
+            vm.prank(nonOwner);
+            tokenRegistry.addToken(address(token), metadata);
         }
 
-        (TokenRegistry.Token[] memory tokens, uint256 finalIndex, bool hasMore) = tokenRegistry.listAllTokens(
-            chainID,
-            0,
-            3,
-            0
-        );
+        (ITokenRegistry.Token[] memory tokens, uint256 total) = tokenRegistry.listTokens(0, 3, TokenStatus.PENDING);
         assertEq(tokens.length, 3);
-        assertEq(finalIndex, 2);
-        assertTrue(hasMore);
-        assertEq(tokens[0].name, "Token 0");
-        assertEq(tokens[2].name, "Token 2");
+        assertEq(total, 5);
 
-        (tokens, finalIndex, hasMore) = tokenRegistry.listAllTokens(chainID, 3, 3, 0);
+        (tokens, total) = tokenRegistry.listTokens(3, 3, TokenStatus.PENDING);
         assertEq(tokens.length, 2);
-        assertEq(finalIndex, 4);
-        assertFalse(hasMore);
+        assertEq(total, 5);
     }
 
-    function testListAllTokensWithDifferentStatuses() public {
+    function testlistTokensWithDifferentStatuses() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
+        MockERC20[] memory mockTokens = new MockERC20[](5);
         for (uint256 i = 0; i < 5; i++) {
-            vm.prank(nonOwner);
-            tokenRegistry.addToken(
-                address(uint160(i + 10)),
-                string(abi.encodePacked("Token ", uintToStr(i))),
-                string(abi.encodePacked("TK", uintToStr(i))),
-                "https://example.com/logo.png",
-                18,
-                chainID
+            mockTokens[i] = new MockERC20(
+                string.concat("Token ", uintToStr(i)),
+                string.concat("TKN", uintToStr(i)),
+                18
             );
+            vm.prank(nonOwner);
+            tokenRegistry.addToken(address(mockTokens[i]), metadata);
 
             if (i % 2 == 0) {
                 vm.prank(owner);
-                tokenRegistry.approveToken(chainID, address(uint160(i + 10)));
+                tokenRegistry.approveToken(address(mockTokens[i]));
             }
         }
 
-        (TokenRegistry.Token[] memory pendingTokens, uint256 pendingFinalIndex, bool hasMorePending) = tokenRegistry
-            .listAllTokens(chainID, 0, 10, 0);
+        (ITokenRegistry.Token[] memory pendingTokens, ) = tokenRegistry.listTokens(0, 10, TokenStatus.PENDING);
         assertEq(pendingTokens.length, 2);
 
-        (TokenRegistry.Token[] memory approvedTokens, uint256 approvedFinalIndex, bool hasMoreApproved) = tokenRegistry
-            .listAllTokens(chainID, 0, 10, 1);
+        (ITokenRegistry.Token[] memory approvedTokens, ) = tokenRegistry.listTokens(0, 10, TokenStatus.APPROVED);
         assertEq(approvedTokens.length, 3);
 
-        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts(chainID);
+        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 2);
         assertEq(approved, 3);
         assertEq(rejected, 0);
     }
 
     function testTokenCount() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
         for (uint256 i = 0; i < 5; i++) {
-            vm.prank(nonOwner);
-            tokenRegistry.addToken(
-                address(uint160(i + 10)),
-                string(abi.encodePacked("Token ", uintToStr(i))),
-                string(abi.encodePacked("TK", uintToStr(i))),
-                "https://example.com/logo.png",
-                18,
-                chainID
+            MockERC20 token = new MockERC20(
+                string.concat("Token ", uintToStr(i)),
+                string.concat("TKN", uintToStr(i)),
+                18
             );
+            vm.prank(nonOwner);
+            tokenRegistry.addToken(address(token), metadata);
         }
 
-        assertEq(tokenRegistry.tokenCount(chainID), 5);
-    }
-
-    function testAcceptTokenEdit() public {
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        vm.prank(nonOwner2);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
-
-        vm.prank(owner);
-        tokenRegistry.acceptTokenEdit(tokenAddress, 1, chainID);
-
-        (
-            address contractAddress,
-            address submitter,
-            string memory name,
-            string memory logoURI,
-            string memory symbol,
-            uint8 decimals,
-            uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 1);
-
-        assertEq(name, "Updated Token", "Name should be updated");
-        assertEq(symbol, "UTK", "Symbol should be updated");
-        assertEq(logoURI, "https://example.com/new_logo.png", "Logo URI should be updated");
-        assertEq(decimals, 9, "Decimals should be updated");
-        assertEq(chainId, chainID);
+        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts();
+        assertEq(pending + approved + rejected, 5);
     }
 
     function testUpdateOwner() public {
@@ -319,654 +177,384 @@ contract TokenRegistryTest is Test {
 
     function testTokenCounters() public {
         // Initial counts should be zero
-        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts(1);
+        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 0);
         assertEq(approved, 0);
         assertEq(rejected, 0);
 
         // Add a token
+        MockERC20 token1 = new MockERC20("Token 1", "TKN1", 18);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo1.png" });
+
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(1), "Test Token", "TEST", "uri", 18, 1);
-        (pending, approved, rejected) = tokenRegistry.getTokenCounts(1);
+        tokenRegistry.addToken(address(token1), metadata);
+        (pending, approved, rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 1);
         assertEq(approved, 0);
         assertEq(rejected, 0);
 
         // Add another token to test rejection
+        MockERC20 token2 = new MockERC20("Token 2", "TKN2", 18);
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
+
         vm.prank(nonOwner);
-        tokenRegistry.addToken(address(2), "Test Token 2", "TEST2", "uri2", 18, 1);
+        tokenRegistry.addToken(address(token2), metadata2);
 
         // Fast track the first token
         vm.prank(owner);
-        tokenRegistry.approveToken(1, address(1));
-        (pending, approved, rejected) = tokenRegistry.getTokenCounts(1);
+        tokenRegistry.approveToken(address(token1));
+        (pending, approved, rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 1); // One token still pending
         assertEq(approved, 1);
         assertEq(rejected, 0);
 
         // Reject the second token
         vm.prank(owner);
-        tokenRegistry.rejectToken(1, address(2), "Test reason");
-        (pending, approved, rejected) = tokenRegistry.getTokenCounts(1);
+        tokenRegistry.rejectToken(address(token2), "Test reason");
+        (pending, approved, rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 0);
         assertEq(approved, 1);
         assertEq(rejected, 1);
     }
 
-    function testMultiChainCounters() public {
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(address(1), "Token1", "T1", "uri1", 18, 1);
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(address(2), "Token2", "T2", "uri2", 18, 2);
-
-        (uint256 pending1, uint256 approved1, uint256 rejected1) = tokenRegistry.getTokenCounts(1);
-        assertEq(pending1, 1);
-        assertEq(approved1, 0);
-        assertEq(rejected1, 0);
-
-        (uint256 pending2, uint256 approved2, uint256 rejected2) = tokenRegistry.getTokenCounts(2);
-        assertEq(pending2, 1);
-        assertEq(approved2, 0);
-        assertEq(rejected2, 0);
-
-        vm.prank(owner);
-        tokenRegistry.approveToken(1, address(1));
-
-        (pending1, approved1, rejected1) = tokenRegistry.getTokenCounts(1);
-        assertEq(pending1, 0);
-        assertEq(approved1, 1);
-        assertEq(rejected1, 0);
-
-        (pending2, approved2, rejected2) = tokenRegistry.getTokenCounts(2);
-        assertEq(pending2, 1);
-        assertEq(approved2, 0);
-        assertEq(rejected2, 0);
+    function uintToString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
 
     function testPaginationWithStatusFilters() public {
-        // Add 10 tokens
+        // Create and add 10 tokens
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        MockERC20[] memory tokens = new MockERC20[](10);
         for (uint256 i = 0; i < 10; i++) {
-            vm.prank(nonOwner);
-            tokenRegistry.addToken(
-                address(uint160(i + 10)),
-                string(abi.encodePacked("Token ", uintToStr(i))),
-                string(abi.encodePacked("TK", uintToStr(i))),
-                "https://example.com/logo.png",
-                18,
-                chainID
+            tokens[i] = new MockERC20(
+                string.concat("Token ", uintToString(i + 1)),
+                string.concat("TKN", uintToString(i + 1)),
+                18
             );
+            tokenRegistry.addToken(address(tokens[i]), metadata);
         }
 
-        // First approve even numbered tokens (0,2,4,6,8)
-        for (uint256 i = 0; i < 10; i++) {
-            if (i % 2 == 0) {
-                vm.prank(owner);
-                tokenRegistry.approveToken(chainID, address(uint160(i + 10)));
-            }
-        }
+        // Approve tokens 3, 4, 5
+        vm.prank(owner);
+        tokenRegistry.approveToken(address(tokens[2]));
+        vm.prank(owner);
+        tokenRegistry.approveToken(address(tokens[3]));
+        vm.prank(owner);
+        tokenRegistry.approveToken(address(tokens[4]));
 
-        // Then reject every third token from the remaining pending tokens (3,9)
-        for (uint256 i = 0; i < 10; i++) {
-            if (i % 2 != 0 && i % 3 == 0) {
-                vm.prank(owner);
-                tokenRegistry.rejectToken(chainID, address(uint160(i + 10)), "Test reason");
-            }
-        }
+        // Reject tokens 6, 7, 8
+        vm.prank(owner);
+        tokenRegistry.rejectToken(address(tokens[5]), "Test rejection");
+        vm.prank(owner);
+        tokenRegistry.rejectToken(address(tokens[6]), "Test rejection");
+        vm.prank(owner);
+        tokenRegistry.rejectToken(address(tokens[7]), "Test rejection");
 
-        // Verify the counts first
-        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts(chainID);
-        assertEq(pending, 3, "Should have 3 pending tokens (1,5,7)");
-        assertEq(approved, 5, "Should have 5 approved tokens (0,2,4,6,8)");
-        assertEq(rejected, 2, "Should have 2 rejected tokens (3,9)");
+        // Test pagination with PENDING status
+        (ITokenRegistry.Token[] memory pendingTokens, uint256 pendingTotal) = tokenRegistry.listTokens(
+            0,
+            3,
+            TokenStatus.PENDING
+        );
+        assertEq(pendingTotal, 4);
+        assertEq(pendingTokens.length, 3);
+        assertEq(pendingTokens[0].name, "Token 1");
+        assertEq(pendingTokens[1].name, "Token 2");
+        assertEq(pendingTokens[2].name, "Token 10");
 
-        // Test pending tokens pagination (should get tokens 1,5)
-        (TokenRegistry.Token[] memory pendingTokens, uint256 pendingFinalIndex, bool hasMorePending) = tokenRegistry
-            .listAllTokens(chainID, 0, 2, 0);
-        assertEq(pendingTokens.length, 2, "Should get 2 pending tokens");
-        assertEq(pendingTokens[0].name, "Token 1", "First pending token should be Token 1");
-        assertEq(pendingTokens[1].name, "Token 5", "Second pending token should be Token 5");
-        assertTrue(hasMorePending, "Should have one more pending token");
+        // Test pagination with APPROVED status
+        (ITokenRegistry.Token[] memory approvedTokens, uint256 approvedTotal) = tokenRegistry.listTokens(
+            0,
+            3,
+            TokenStatus.APPROVED
+        );
+        assertEq(approvedTotal, 3);
+        assertEq(approvedTokens.length, 3);
+        assertEq(approvedTokens[0].name, "Token 3");
+        assertEq(approvedTokens[1].name, "Token 4");
+        assertEq(approvedTokens[2].name, "Token 5");
 
-        // Test rejected tokens pagination (should get tokens 3,9)
-        (TokenRegistry.Token[] memory rejectedTokens, uint256 rejectedFinalIndex, bool hasMoreRejected) = tokenRegistry
-            .listAllTokens(chainID, 0, 2, 2);
-        assertEq(rejectedTokens.length, 2, "Should get 2 rejected tokens");
-        assertEq(rejectedTokens[0].name, "Token 3", "First rejected token should be Token 3");
-        assertEq(rejectedTokens[1].name, "Token 9", "Second rejected token should be Token 9");
-        assertFalse(hasMoreRejected, "Should not have more rejected tokens");
-
-        // Get full lists to verify counts
-        (TokenRegistry.Token[] memory allPending, , ) = tokenRegistry.listAllTokens(chainID, 0, 100, 0);
-        (TokenRegistry.Token[] memory allApproved, , ) = tokenRegistry.listAllTokens(chainID, 0, 100, 1);
-        (TokenRegistry.Token[] memory allRejected, , ) = tokenRegistry.listAllTokens(chainID, 0, 100, 2);
-
-        assertEq(allPending.length, pending, "Full pending list length should match counter");
-        assertEq(allApproved.length, approved, "Full approved list length should match counter");
-        assertEq(allRejected.length, rejected, "Full rejected list length should match counter");
+        // Test pagination with REJECTED status
+        (ITokenRegistry.Token[] memory rejectedTokens, uint256 rejectedTotal) = tokenRegistry.listTokens(
+            0,
+            3,
+            TokenStatus.REJECTED
+        );
+        assertEq(rejectedTotal, 3);
+        assertEq(rejectedTokens.length, 3);
+        assertEq(rejectedTokens[0].name, "Token 6");
+        assertEq(rejectedTokens[1].name, "Token 7");
+        assertEq(rejectedTokens[2].name, "Token 8");
     }
 
     function testMixedStatusPagination() public {
+        MockERC20[] memory mockTokens = new MockERC20[](10);
+
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+
         for (uint256 i = 0; i < 10; i++) {
-            vm.prank(nonOwner);
-            tokenRegistry.addToken(
-                address(uint160(i + 10)),
-                string(abi.encodePacked("Token ", uintToStr(i))),
-                string(abi.encodePacked("TK", uintToStr(i))),
-                "https://example.com/logo.png",
-                18,
-                chainID
+            mockTokens[i] = new MockERC20(
+                string.concat("Token ", uintToStr(i)),
+                string.concat("TKN", uintToStr(i)),
+                18
             );
+            vm.prank(nonOwner);
+            tokenRegistry.addToken(address(mockTokens[i]), metadata);
 
             if (i % 3 == 0) {
                 vm.prank(owner);
-                tokenRegistry.approveToken(chainID, address(uint160(i + 10)));
+                tokenRegistry.approveToken(address(mockTokens[i]));
             } else if (i % 3 == 1) {
                 vm.prank(owner);
-                tokenRegistry.rejectToken(chainID, address(uint160(i + 10)), "Test reason");
+                tokenRegistry.rejectToken(address(mockTokens[i]), "Test reason");
             }
         }
 
-        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts(chainID);
+        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts();
         assertEq(pending, 3);
         assertEq(approved, 4);
         assertEq(rejected, 3);
 
-        (TokenRegistry.Token[] memory pendingTokens, , ) = tokenRegistry.listAllTokens(chainID, 0, 10, 0);
+        (ITokenRegistry.Token[] memory pendingTokens, ) = tokenRegistry.listTokens(0, 10, TokenStatus.PENDING);
         assertEq(pendingTokens.length, 3);
         assertEq(pendingTokens[0].name, "Token 2");
         assertEq(pendingTokens[1].name, "Token 5");
         assertEq(pendingTokens[2].name, "Token 8");
 
-        (TokenRegistry.Token[] memory approvedTokens, , ) = tokenRegistry.listAllTokens(chainID, 0, 10, 1);
+        (ITokenRegistry.Token[] memory approvedTokens, ) = tokenRegistry.listTokens(0, 10, TokenStatus.APPROVED);
         assertEq(approvedTokens.length, 4);
         assertEq(approvedTokens[0].name, "Token 0");
         assertEq(approvedTokens[3].name, "Token 9");
 
-        (TokenRegistry.Token[] memory rejectedTokens, , ) = tokenRegistry.listAllTokens(chainID, 0, 10, 2);
+        (ITokenRegistry.Token[] memory rejectedTokens, ) = tokenRegistry.listTokens(0, 10, TokenStatus.REJECTED);
         assertEq(rejectedTokens.length, 3);
         assertEq(rejectedTokens[0].name, "Token 1");
         assertEq(rejectedTokens[2].name, "Token 7");
     }
 
-    function testAddTokenWithMetadata() public {
-        // Add fields first
-        vm.startPrank(owner);
-        metadataRegistry.addMetadataField("website");
-        metadataRegistry.addMetadataField("twitter");
-        vm.stopPrank();
-
-        // Prepare metadata inputs
-        MetadataInput[] memory metadata = new MetadataInput[](2);
-        metadata[0] = MetadataInput({ field: "website", value: "https://example.com" });
-        metadata[1] = MetadataInput({ field: "twitter", value: "@example" });
-
-        // Add token with metadata
-        vm.prank(nonOwner);
-        tokenRegistry.addTokenWithMetadata(
-            tokenAddress,
-            "Test Token",
-            "TEST",
-            "https://logo.com",
-            18,
-            chainID,
-            metadata
-        );
-
-        // Verify metadata was set
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "website"), "https://example.com");
-        assertEq(metadataRegistry.getMetadata(tokenAddress, chainID, "twitter"), "@example");
-    }
-
-    function testCannotAddTokenWithInvalidMetadataField() public {
-        // Prepare metadata inputs with invalid field
-        MetadataInput[] memory metadata = new MetadataInput[](1);
-        metadata[0] = MetadataInput({ field: "invalid_field", value: "some value" });
-
-        vm.prank(nonOwner);
-        vm.expectRevert("Invalid field");
-        tokenRegistry.addTokenWithMetadata(
-            tokenAddress,
-            "Test Token",
-            "TEST",
-            "https://logo.com",
-            18,
-            chainID,
-            metadata
-        );
-    }
-
-    function testRejectTokenEdit() public {
-        // Add and approve token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Create edit
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
-
-        // Reject the edit
-        vm.prank(owner);
-        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID, "Invalid token symbol");
-
-        // Verify edit was cleared
-        (address contractAddress, , , , , , ) = tokenRegistry.editsOnTokens(chainID, tokenAddress, 1);
-        assertEq(contractAddress, address(0), "Edit should be cleared");
-    }
-
-    function testCannotRejectTokenEditWithoutPermission() public {
-        // Add and approve token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Create edit
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
-
-        // Try to reject without permission
-        vm.prank(nonOwner);
-        vm.expectRevert("Failed to reject token edit");
-        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID, "Invalid token symbol");
-    }
-
-    function testAcceptTokenEditClearsOtherEdits() public {
-        // Add and approve token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Create multiple edits
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 1",
-            "UT1",
-            "https://example.com/logo1.png",
-            9,
-            chainID
-        );
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 2",
-            "UT2",
-            "https://example.com/logo2.png",
-            12,
-            chainID
-        );
-
-        // Accept first edit
-        vm.prank(owner);
-        tokenRegistry.acceptTokenEdit(tokenAddress, 1, chainID);
-
-        // Verify second edit was cleared
-        (address contractAddress, , , , , , ) = tokenRegistry.editsOnTokens(chainID, tokenAddress, 2);
-        assertEq(contractAddress, address(0), "Second edit should be cleared");
-
-        // Verify edit count was reset
-        assertEq(tokenRegistry.editCount(chainID, tokenAddress), 0, "Edit count should be reset");
-    }
-
-    function testEditTracking() public {
-        // Add and approve a token first
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Verify no edits initially
-        assertEq(tokenRegistry.tokensWithEditsLength(chainID), 0);
-
-        // Create first edit
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
-
-        // Verify token is tracked
-        assertEq(tokenRegistry.tokensWithEditsLength(chainID), 1);
-        assertEq(tokenRegistry.getTokensWithEdits(chainID, 0), tokenAddress);
-        assertEq(tokenRegistry.editCount(chainID, tokenAddress), 1);
-
-        // Create second edit
-        vm.prank(nonOwner2);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 2",
-            "UTK2",
-            "https://example.com/new_logo2.png",
-            12,
-            chainID
-        );
-
-        // Verify tracking remains correct
-        assertEq(tokenRegistry.tokensWithEditsLength(chainID), 1);
-        assertEq(tokenRegistry.editCount(chainID, tokenAddress), 2);
-    }
-
-    function testListEdits() public {
-        // Add and approve a token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Create multiple edits
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 1",
-            "UT1",
-            "https://example.com/logo1.png",
-            9,
-            chainID
-        );
-        vm.prank(nonOwner2);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 2",
-            "UT2",
-            "https://example.com/logo2.png",
-            12,
-            chainID
-        );
-
-        // Test listing with pagination
-        (TokenRegistry.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenRegistry.listAllEdits(
-            chainID,
-            0,
-            1
-        );
-
-        assertEq(edits.length, 1);
-        assertEq(edits[0].name, "Updated Token 1");
-        assertEq(edits[0].editIndex, 1);
-        assertTrue(hasMore);
-
-        // Get second page
-        (edits, finalIndex, hasMore) = tokenRegistry.listAllEdits(chainID, 1, 1);
-
-        assertEq(edits.length, 1);
-        assertEq(edits[0].name, "Updated Token 2");
-        assertEq(edits[0].editIndex, 2);
-        assertFalse(hasMore);
-    }
-
-    function testRemoveEditTracking() public {
-        // Add and approve a token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Create an edit
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTK",
-            "https://example.com/new_logo.png",
-            9,
-            chainID
-        );
-
-        // Reject the edit
-        vm.prank(owner);
-        tokenRegistry.rejectTokenEdit(tokenAddress, 1, chainID, "Invalid token symbol");
-
-        // Verify token is no longer tracked
-        assertEq(tokenRegistry.tokensWithEditsLength(chainID), 0);
-        assertEq(tokenRegistry.editCount(chainID, tokenAddress), 0);
-    }
-
-    function testMultipleTokenEdits() public {
-        address token2 = address(5);
-
-        // Add and approve two tokens
-        vm.startPrank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token 1", "TT1", "https://example.com/logo1.png", 18, chainID);
-        tokenRegistry.addToken(token2, "Test Token 2", "TT2", "https://example.com/logo2.png", 18, chainID);
-        vm.stopPrank();
-
-        vm.startPrank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-        tokenRegistry.approveToken(chainID, token2);
-        vm.stopPrank();
-
-        // Create edits for both tokens
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 1",
-            "UT1",
-            "https://example.com/new_logo1.png",
-            9,
-            chainID
-        );
-        vm.prank(nonOwner2);
-        tokenRegistry.proposeTokenEdit(
-            token2,
-            "Updated Token 2",
-            "UT2",
-            "https://example.com/new_logo2.png",
-            12,
-            chainID
-        );
-
-        // Verify tracking
-        assertEq(tokenRegistry.tokensWithEditsLength(chainID), 2);
-        assertEq(tokenRegistry.getTokensWithEdits(chainID, 0), tokenAddress);
-        assertEq(tokenRegistry.getTokensWithEdits(chainID, 1), token2);
-
-        // List all edits
-        (TokenRegistry.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenRegistry.listAllEdits(
-            chainID,
-            0,
-            10
-        );
-
-        assertEq(edits.length, 2);
-        assertEq(edits[0].contractAddress, tokenAddress);
-        assertEq(edits[1].contractAddress, token2);
-    }
-
-    function testAcceptEditClearsTracking() public {
-        // Add and approve a token
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TTK", "https://example.com/logo.png", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Create multiple edits
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 1",
-            "UT1",
-            "https://example.com/logo1.png",
-            9,
-            chainID
-        );
-        vm.prank(nonOwner2);
-        tokenRegistry.proposeTokenEdit(
-            tokenAddress,
-            "Updated Token 2",
-            "UT2",
-            "https://example.com/logo2.png",
-            12,
-            chainID
-        );
-
-        // Accept first edit
-        vm.prank(owner);
-        tokenRegistry.acceptTokenEdit(tokenAddress, 1, chainID);
-
-        // Verify all tracking is cleared
-        assertEq(tokenRegistry.tokensWithEditsLength(chainID), 0);
-        assertEq(tokenRegistry.editCount(chainID, tokenAddress), 0);
-
-        // Verify token was updated with accepted edit
-        (address contractAddress, , string memory name, , string memory symbol, uint8 decimals, ) = tokenRegistry
-            .tokens(chainID, tokenAddress, 1);
-
-        assertEq(contractAddress, tokenAddress);
-        assertEq(name, "Updated Token 1");
-        assertEq(symbol, "UT1");
-        assertEq(decimals, 9);
-    }
-
-    function testProposeTokenAndMetadataEdit() public {
-        // Add and approve token first
-        vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
-        vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
-
-        // Setup metadata field
-        vm.prank(owner);
-        metadataRegistry.addMetadataField("website");
-
-        // Prepare metadata updates
-        MetadataInput[] memory updates = new MetadataInput[](1);
-        updates[0] = MetadataInput({ field: "website", value: "https://example.com" });
-
-        // Propose both edits
-        vm.prank(nonOwner);
-        tokenRegistry.proposeTokenAndMetadataEdit(
-            tokenAddress,
-            "Updated Token",
-            "UTEST",
-            "newlogo",
-            18,
-            chainID,
-            updates
-        );
-
-        // Verify token edit was proposed
-        (TokenRegistry.TokenEdit[] memory edits, uint256 finalIndex, bool hasMore) = tokenRegistry.listAllEdits(
-            chainID,
-            0,
-            1
-        );
-        TokenRegistry.TokenEdit memory tokenEdit = edits[0];
-        assertEq(tokenEdit.name, "Updated Token");
-        assertEq(tokenEdit.symbol, "UTEST");
-
-        // Verify metadata edit was proposed
-        (
-            TokenMetadataRegistry.MetadataEditInfo[] memory metadataEdits,
-            uint256 metadataFinalIndex,
-            bool metadataHasMore
-        ) = metadataRegistry.listAllEdits(chainID, 0, 1);
-
-        assertEq(metadataEdits.length, 1);
-        assertEq(metadataEdits[0].updates[0].value, "https://example.com");
-    }
-
     function testResubmitRejectedToken() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         // Reject the token
         vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress, "Test reason");
+        tokenRegistry.rejectToken(address(mockToken), "Test reason");
 
         // Verify token is rejected
-        (address contractAddress, , , , , , ) = tokenRegistry.tokens(chainID, tokenAddress, 2); // status 2 = rejected
-        assertEq(contractAddress, tokenAddress);
-        assertEq(tokenRegistry.rejectedTokenCount(chainID), 1);
-        assertEq(tokenRegistry.pendingTokenCount(chainID), 0);
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo.png");
+        (uint256 pending, uint256 approved, uint256 rejected) = tokenRegistry.getTokenCounts();
+        assertEq(pending, 0);
+        assertEq(approved, 0);
+        assertEq(rejected, 1);
 
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
         // Resubmit the token with updated information
         vm.prank(nonOwner2);
-        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
+        tokenRegistry.addToken(address(mockToken), metadata2);
 
         // Verify token is now pending and rejected state is cleaned up
-        (
-            address contractAddressPending,
-            address submitter,
-            string memory name,
-            string memory logoURI,
-            string memory symbol,
-            uint8 decimals,
-            uint256 chainId
-        ) = tokenRegistry.tokens(chainID, tokenAddress, 0);
-        assertEq(contractAddressPending, tokenAddress);
-        assertEq(name, "Test Token V2");
-        assertEq(symbol, "TEST2");
-        assertEq(tokenRegistry.pendingTokenCount(chainID), 1);
-        assertEq(tokenRegistry.rejectedTokenCount(chainID), 0);
+        assertEq(tokenRegistry.getToken(address(mockToken)).logoURI, "https://example.com/logo2.png");
+        (pending, approved, rejected) = tokenRegistry.getTokenCounts();
+        assertEq(pending, 1);
+        assertEq(approved, 0);
+        assertEq(rejected, 0);
 
+        TokenStatus status = tokenRegistry.tokenStatus(address(mockToken));
         // Verify rejected state is cleared
-        (contractAddress, , , , , , ) = tokenRegistry.tokens(chainID, tokenAddress, 2);
-        assertEq(contractAddress, address(0));
+        assertEq(uint8(status), uint8(TokenStatus.PENDING));
     }
 
     function testResubmitRejectedTokenCannotBypassApproval() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         // Reject the token
         vm.prank(owner);
-        tokenRegistry.rejectToken(chainID, tokenAddress, "Test reason");
+        tokenRegistry.rejectToken(address(mockToken), "Test reason");
+
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
 
         // Resubmit and try to fast-track without proper authorization
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
+        tokenRegistry.addToken(address(mockToken), metadata2);
 
         vm.prank(nonOwner);
-        vm.expectRevert("Only the owner can call this function");
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        vm.expectRevert("Not authorized to approve token");
+        tokenRegistry.approveToken(address(mockToken));
     }
 
     function testCannotResubmitPendingToken() public {
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
+
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
 
         // Try to resubmit while still pending
         vm.prank(nonOwner);
         vm.expectRevert("Token already exists in pending or approved state");
-        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
+        tokenRegistry.addToken(address(mockToken), metadata2);
     }
 
     function testCannotResubmitApprovedToken() public {
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
         // First submission
         vm.prank(nonOwner);
-        tokenRegistry.addToken(tokenAddress, "Test Token", "TEST", "logo", 18, chainID);
+        tokenRegistry.addToken(address(mockToken), metadata);
 
         // Approve the token
         vm.prank(owner);
-        tokenRegistry.approveToken(chainID, tokenAddress);
+        tokenRegistry.approveToken(address(mockToken));
 
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
         // Try to resubmit while approved
         vm.prank(nonOwner);
         vm.expectRevert("Token already exists in pending or approved state");
-        tokenRegistry.addToken(tokenAddress, "Test Token V2", "TEST2", "logo2", 18, chainID);
+        tokenRegistry.addToken(address(mockToken), metadata2);
+    }
+
+    function testGetTokenWithMetadata() public {
+        // Add a token with metadata
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(mockToken), metadata);
+        vm.stopPrank();
+
+        // Add additional metadata fields
+        vm.startPrank(owner);
+        tokenRegistry.approveToken(address(mockToken));
+        tokenMetadata.addField("website");
+        tokenMetadata.addField("twitter");
+        vm.stopPrank();
+
+        // Set additional metadata
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory additionalMetadata = new MetadataInput[](2);
+        additionalMetadata[0] = MetadataInput({ field: "website", value: "https://example.com" });
+        additionalMetadata[1] = MetadataInput({ field: "twitter", value: "@example" });
+        tokenEdits.proposeEdit(address(mockToken), additionalMetadata);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        tokenEdits.acceptEdit(address(mockToken), 1);
+        vm.stopPrank();
+
+        // Get token with metadata
+        ITokenRegistry.Token memory token = tokenRegistry.getToken(address(mockToken), true);
+
+        // Verify token data
+        assertEq(token.contractAddress, address(mockToken));
+        assertEq(token.name, "Test Token");
+        assertEq(token.symbol, "TEST");
+        assertEq(token.decimals, 18);
+
+        // Verify metadata
+        assertEq(token.metadata.length, 3);
+
+        // Verify logoURI field
+        assertEq(token.metadata[0].field, "logoURI");
+        assertEq(token.metadata[0].value, "https://example.com/logo.png");
+        assertTrue(token.metadata[0].isActive);
+
+        // Verify website field
+        assertEq(token.metadata[1].field, "website");
+        assertEq(token.metadata[1].value, "https://example.com");
+        assertTrue(token.metadata[1].isActive);
+
+        // Verify twitter field
+        assertEq(token.metadata[2].field, "twitter");
+        assertEq(token.metadata[2].value, "@example");
+        assertTrue(token.metadata[2].isActive);
+    }
+
+    function testGetTokens() public {
+        // Create and add multiple tokens
+        MockERC20 mockToken2 = new MockERC20("Test Token 2", "TEST2", 6);
+        MockERC20 mockToken3 = new MockERC20("Test Token 3", "TEST3", 8);
+
+        vm.startPrank(nonOwner);
+
+        // Add first token
+        MetadataInput[] memory metadata1 = new MetadataInput[](1);
+        metadata1[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo1.png" });
+        tokenRegistry.addToken(address(mockToken), metadata1);
+
+        // Add second token
+        MetadataInput[] memory metadata2 = new MetadataInput[](1);
+        metadata2[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo2.png" });
+        tokenRegistry.addToken(address(mockToken2), metadata2);
+
+        // Add third token
+        MetadataInput[] memory metadata3 = new MetadataInput[](1);
+        metadata3[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo3.png" });
+        tokenRegistry.addToken(address(mockToken3), metadata3);
+
+        vm.stopPrank();
+
+        // Create array of addresses to query
+        address[] memory addresses = new address[](3);
+        addresses[0] = address(mockToken);
+        addresses[1] = address(mockToken2);
+        addresses[2] = address(mockToken3);
+
+        // Get tokens
+        ITokenRegistry.Token[] memory tokens = tokenRegistry.getTokens(addresses);
+
+        // Verify length
+        assertEq(tokens.length, 3);
+
+        // Verify first token
+        assertEq(tokens[0].contractAddress, address(mockToken));
+        assertEq(tokens[0].name, "Test Token");
+        assertEq(tokens[0].symbol, "TEST");
+        assertEq(tokens[0].decimals, 18);
+        assertEq(tokens[0].logoURI, "https://example.com/logo1.png");
+
+        // Verify second token
+        assertEq(tokens[1].contractAddress, address(mockToken2));
+        assertEq(tokens[1].name, "Test Token 2");
+        assertEq(tokens[1].symbol, "TEST2");
+        assertEq(tokens[1].decimals, 6);
+        assertEq(tokens[1].logoURI, "https://example.com/logo2.png");
+
+        // Verify third token
+        assertEq(tokens[2].contractAddress, address(mockToken3));
+        assertEq(tokens[2].name, "Test Token 3");
+        assertEq(tokens[2].symbol, "TEST3");
+        assertEq(tokens[2].decimals, 8);
+        assertEq(tokens[2].logoURI, "https://example.com/logo3.png");
     }
 }

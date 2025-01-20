@@ -4,8 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Script.sol";
 import "src/TokenRegistry.sol";
 import "src/TokentrollerV1.sol";
-import "src/TokenMetadataRegistry.sol";
-
+import "src/TokenMetadata.sol";
 contract DeployTokenRegistry is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -17,13 +16,13 @@ contract DeployTokenRegistry is Script {
         // Deploy the TokentrollerV1 contract
         TokentrollerV1 tokentroller = new TokentrollerV1(initialOwner);
 
-        // The TokenRegistry and TokenMetadataRegistry are automatically deployed by the TokentrollerV1 constructor
+        // The TokenRegistry and TokenMetadata are automatically deployed by the TokentrollerV1 constructor
         address tokenRegistryAddress = tokentroller.tokenRegistry();
-        address metadataRegistryAddress = tokentroller.metadataRegistry();
+        address tokenMetadataAddress = tokentroller.tokenMetadata();
 
         console.log("TokentrollerV1 deployed at:", address(tokentroller));
         console.log("TokenRegistry deployed at:", tokenRegistryAddress);
-        console.log("TokenMetadataRegistry deployed at:", metadataRegistryAddress);
+        console.log("TokenMetadata deployed at:", tokenMetadataAddress);
 
         vm.stopBroadcast();
     }
