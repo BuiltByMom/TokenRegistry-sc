@@ -101,7 +101,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing approval
      * @return bool Returns true if the token can be approved, false otherwise
      *********************************************************************************************/
-    function canApproveToken(address sender, address contractAddress) public view virtual returns (bool) {
+    function canApproveToken(address sender, address contractAddress) external view virtual returns (bool) {
         return sender == owner;
     }
 
@@ -113,7 +113,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing rejection
      * @return bool Returns true if the token can be rejected, false otherwise
      *********************************************************************************************/
-    function canRejectToken(address sender, address contractAddress) public view virtual returns (bool) {
+    function canRejectToken(address sender, address contractAddress) external view virtual returns (bool) {
         return sender == owner;
     }
 
@@ -125,7 +125,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canAddToken(address sender, address contractAddress) public view returns (bool) {
+    function canAddToken(address sender, address contractAddress) external view virtual returns (bool) {
         return true;
     }
 
@@ -137,7 +137,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canUpdateToken(address sender, address contractAddress) public view returns (bool) {
+    function canUpdateToken(address sender, address contractAddress) external view virtual returns (bool) {
         TokenRegistry registry = TokenRegistry(tokenRegistry);
         TokenStatus status = registry.tokenStatus(contractAddress);
         return sender == tokenEdits && status == TokenStatus.APPROVED;
@@ -151,7 +151,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing token updates
      * @return bool Returns true if the token can be updated, false otherwise
      *********************************************************************************************/
-    function canProposeTokenEdit(address sender, address contractAddress) public view returns (bool) {
+    function canProposeTokenEdit(address sender, address contractAddress) external view virtual returns (bool) {
         // Check if the token is approved
         return TokenRegistry(tokenRegistry).tokenStatus(contractAddress) == TokenStatus.APPROVED;
     }
@@ -165,7 +165,11 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing edit acceptance
      * @return bool Returns true if the edit can be accepted, false otherwise
      *********************************************************************************************/
-    function canAcceptTokenEdit(address sender, address contractAddress, uint256 editId) public view returns (bool) {
+    function canAcceptTokenEdit(
+        address sender,
+        address contractAddress,
+        uint256 editId
+    ) external view virtual returns (bool) {
         return sender == owner;
     }
 
@@ -173,7 +177,7 @@ contract TokentrollerV1 is ITokentroller {
      * @dev Checks if a token edit can be rejected
      * @param sender The address of the sender
      * @param contractAddress The address of the token for which the edit is proposed
-     * @param editIndex The index of the edit to be rejected
+     * @param editId The id of the edit to be rejected
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing edit rejection
      * @return bool Returns true if the edit can be rejected, false otherwise
@@ -181,8 +185,8 @@ contract TokentrollerV1 is ITokentroller {
     function canRejectTokenEdit(
         address sender,
         address contractAddress,
-        uint256 editIndex
-    ) external view returns (bool) {
+        uint256 editId
+    ) external view virtual returns (bool) {
         return sender == owner;
     }
 
@@ -194,7 +198,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing metadata field addition
      * @return bool Returns true if the metadata field can be added, false otherwise
      *********************************************************************************************/
-    function canAddMetadataField(address sender, string calldata name) external view returns (bool) {
+    function canAddMetadataField(address sender, string calldata name) external view virtual returns (bool) {
         return sender == owner;
     }
 
@@ -213,43 +217,29 @@ contract TokentrollerV1 is ITokentroller {
         string calldata name,
         bool isActive,
         bool isRequired
-    ) external view returns (bool) {
+    ) external view virtual returns (bool) {
         return sender == owner;
     }
 
     /**********************************************************************************************
      * @dev Checks if a metadata field can be set
      * @param sender The address of the sender
-     * @param token The address of the token
+     * @param contractAddress The address of the token
      * @param field The name of the metadata field
      * @notice This function is called by the TokenRegistry contract
      * @notice It should implement any necessary checks before allowing metadata field updates
      * @return bool Returns true if the metadata field can be updated, false otherwise
      *********************************************************************************************/
-    function canSetMetadata(address sender, address token, string calldata field) external view returns (bool) {
+    function canSetMetadata(
+        address sender,
+        address contractAddress,
+        string calldata field
+    ) external view virtual returns (bool) {
         TokenRegistry registry = TokenRegistry(tokenRegistry);
-        TokenStatus status = registry.tokenStatus(token);
+        TokenStatus status = registry.tokenStatus(contractAddress);
 
         // Only allow setting metadata for pending or new tokens
         return status == TokenStatus.PENDING || status == TokenStatus.NONE;
-    }
-
-    /**********************************************************************************************
-     * @dev Checks if a metadata edit can be proposed
-     * @param sender The address of the sender
-     * @param token The address of the token
-     * @param updates The array of MetadataInput structs
-     * @notice This function is called by the TokenMetadata contract
-     * @notice This function verifies that the token is approved
-     * @return bool Returns true if the metadata edit can be proposed, false otherwise
-     *********************************************************************************************/
-    function canProposeMetadataEdit(
-        address sender,
-        address token,
-        MetadataInput[] calldata updates
-    ) external view returns (bool) {
-        // Allow anyone to propose edits for approved tokens
-        return TokenRegistry(tokenRegistry).tokenStatus(token) == TokenStatus.APPROVED;
     }
 
     /**********************************************************************************************
@@ -260,33 +250,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing token addition
      * @return bool Returns true if the token can be added, false otherwise
      *********************************************************************************************/
-    function canUpdateMetadata(address sender, address contractAddress) public view returns (bool) {
+    function canUpdateMetadata(address sender, address contractAddress) external view virtual returns (bool) {
         return sender == tokenRegistry || sender == tokenEdits;
-    }
-
-    /**********************************************************************************************
-     * @dev Checks if a metadata edit can be accepted
-     * @param sender The address of the sender
-     * @param token The address of the token
-     * @param editIndex The index of the edit to be accepted
-     * @notice This function is called by the TokenMetadata contract
-     * @notice This function verifies that the sender is the owner
-     * @return bool Returns true if the metadata edit can be accepted, false otherwise
-     *********************************************************************************************/
-    function canAcceptMetadataEdit(address sender, address token, uint256 editIndex) external view returns (bool) {
-        return sender == owner;
-    }
-
-    /**********************************************************************************************
-     * @dev Checks if a metadata edit can be rejected
-     * @param sender The address of the sender
-     * @param token The address of the token
-     * @param editIndex The index of the edit to be rejected
-     * @notice This function is called by the TokenMetadata contract
-     * @notice This function verifies that the sender is the owner
-     * @return bool Returns true if the metadata edit can be rejected, false otherwise
-     *********************************************************************************************/
-    function canRejectMetadataEdit(address sender, address token, uint256 editIndex) external view returns (bool) {
-        return sender == owner;
     }
 }

@@ -75,6 +75,35 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
         return executingCrossChainMessage; // Only allow during cross-chain execution
     }
 
+    function canAcceptTokenEdit(
+        address sender,
+        address contractAddress,
+        uint256 editId
+    ) public view override returns (bool) {
+        return executingCrossChainMessage; // Only allow during cross-chain execution
+    }
+
+    function canRejectTokenEdit(
+        address sender,
+        address contractAddress,
+        uint256 editId
+    ) public view override returns (bool) {
+        return executingCrossChainMessage; // Only allow during cross-chain execution
+    }
+
+    function canAddMetadataField(address sender, string calldata name) public view override returns (bool) {
+        return executingCrossChainMessage; // Only allow during cross-chain execution
+    }
+
+    function canUpdateMetadataField(
+        address sender,
+        string calldata name,
+        bool isActive,
+        bool isRequired
+    ) public view override returns (bool) {
+        return executingCrossChainMessage; // Only allow during cross-chain execution
+    }
+
     // Cross-chain message handlers
     function executeApproveToken(address token) external onlyFromRoot crossChainContext {
         try TokenRegistry(tokenRegistry).approveToken(token) {
@@ -87,6 +116,72 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
 
     function executeRejectToken(address token, string calldata reason) external onlyFromRoot crossChainContext {
         try TokenRegistry(tokenRegistry).rejectToken(token, reason) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory revertReason) {
+            emit CrossChainMessageFailed(currentMessageId, revertReason);
+            revert(revertReason);
+        }
+    }
+
+    function executeAcceptTokenEdit(address token, uint256 editId) external onlyFromRoot crossChainContext {
+        try TokenEdits(tokenEdits).acceptEdit(token, editId) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory reason) {
+            emit CrossChainMessageFailed(currentMessageId, reason);
+            revert(reason);
+        }
+    }
+
+    function executeRejectTokenEdit(
+        address token,
+        uint256 editId,
+        string calldata reason
+    ) external onlyFromRoot crossChainContext {
+        try TokenEdits(tokenEdits).rejectEdit(token, editId, reason) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory revertReason) {
+            emit CrossChainMessageFailed(currentMessageId, revertReason);
+            revert(revertReason);
+        }
+    }
+
+    function executeAddMetadataField(string calldata name) external onlyFromRoot crossChainContext {
+        try TokenMetadata(tokenMetadata).addField(name) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory reason) {
+            emit CrossChainMessageFailed(currentMessageId, reason);
+            revert(reason);
+        }
+    }
+
+    function executeUpdateMetadataField(
+        string calldata name,
+        bool isActive,
+        bool isRequired
+    ) external onlyFromRoot crossChainContext {
+        try TokenMetadata(tokenMetadata).updateField(name, isActive, isRequired) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory reason) {
+            emit CrossChainMessageFailed(currentMessageId, reason);
+            revert(reason);
+        }
+    }
+
+    function executeAcceptMetadataEdit(address token, uint256 editId) external onlyFromRoot crossChainContext {
+        try TokenEdits(tokenEdits).acceptEdit(token, editId) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory reason) {
+            emit CrossChainMessageFailed(currentMessageId, reason);
+            revert(reason);
+        }
+    }
+
+    function executeRejectMetadataEdit(
+        address token,
+        uint256 editId,
+        string calldata reason
+    ) external onlyFromRoot crossChainContext {
+        try TokenEdits(tokenEdits).rejectEdit(token, editId, reason) {
             emit CrossChainMessageExecuted(currentMessageId, msg.data);
         } catch Error(string memory revertReason) {
             emit CrossChainMessageFailed(currentMessageId, revertReason);

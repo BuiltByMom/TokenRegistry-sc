@@ -11,12 +11,8 @@ interface ITokentroller {
     function canUpdateToken(address sender, address contractAddress) external view returns (bool);
     function canProposeTokenEdit(address sender, address contractAddress) external view returns (bool);
 
-    function canAcceptTokenEdit(
-        address sender,
-        address contractAddress,
-        uint256 editIndex
-    ) external view returns (bool);
-    function canRejectTokenEdit(address sender, address token, uint256 editIndex) external view returns (bool);
+    function canAcceptTokenEdit(address sender, address contractAddress, uint256 editId) external view returns (bool);
+    function canRejectTokenEdit(address sender, address contractAddress, uint256 editId) external view returns (bool);
 
     function canAddMetadataField(address sender, string calldata name) external view returns (bool);
     function canUpdateMetadataField(
@@ -25,17 +21,11 @@ interface ITokentroller {
         bool isActive,
         bool isRequired
     ) external view returns (bool);
-    function canSetMetadata(address sender, address token, string calldata field) external view returns (bool);
-
-    function canUpdateMetadata(address sender, address token) external view returns (bool);
-
-    function canProposeMetadataEdit(
+    function canSetMetadata(
         address sender,
-        address token,
-        MetadataInput[] calldata updates
+        address contractAddress,
+        string calldata field
     ) external view returns (bool);
 
-    function canAcceptMetadataEdit(address sender, address token, uint256 editIndex) external view returns (bool);
-
-    function canRejectMetadataEdit(address sender, address token, uint256 editIndex) external view returns (bool);
+    function canUpdateMetadata(address sender, address contractAddress) external view returns (bool);
 }
