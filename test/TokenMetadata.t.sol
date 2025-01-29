@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "src/TokenMetadata.sol";
-import "src/TokentrollerV1.sol";
+import "src/controllers/TokentrollerV1.sol";
 import "src/TokenRegistry.sol";
 import "./mocks/MockERC20.sol";
 

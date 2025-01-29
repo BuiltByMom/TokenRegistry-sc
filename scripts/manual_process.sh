@@ -3,8 +3,8 @@
 # Load environment variables
 source .env
 
-TOKENTROLLER_ROOT=$(cat broadcast/DeployTokentrollerRoot.s.sol/1000/run-latest.json | jq -r '.transactions[] | select(.contractName=="TokentrollerRoot") | .contractAddress')
-TOKENTROLLER_LEAF=$(cat broadcast/DeployTokentrollerLeaf.s.sol/1001/run-latest.json | jq -r '.transactions[] | select(.contractName=="TokentrollerLeaf") | .contractAddress')
+HYPERLANE_ROOT_PLUGIN=$(cat broadcast/DeployHyperlaneRootPlugin.s.sol/1000/run-latest.json | jq -r '.transactions[] | select(.contractName=="HyperlaneRootPlugin") | .contractAddress')
+HYPERLANE_LEAF_PLUGIN=$(cat broadcast/DeployHyperlaneLeafPlugin.s.sol/1001/run-latest.json | jq -r '.transactions[] | select(.contractName=="HyperlaneLeafPlugin") | .contractAddress')
 TEST_TOKEN=$(cat broadcast/DeployAll.s.sol/1001/run-latest.json | jq -r '.transactions[] | select(.contractName=="TestTokenDeployment") | .contractAddress')
 
 # # Get message details from the parent chain
@@ -53,12 +53,12 @@ MESSAGE=0x0300000007000003e80000000000000000000000001f4fc3074ce3da47ea5bda7c7cca
 
 # Try call first to get more error details
 echo "Trying call first to debug..."
-cast call --rpc-url http://localhost:8546 $LEAF_MAILBOX "process(bytes,bytes)" "0x" $MESSAGE
+cast call --rpc-url http://localhost:8546 $HYPERLANE_LEAF_PLUGIN "process(bytes,bytes)" "0x" $MESSAGE
 
 # Try with trace to see where it reverts
 echo "Trying with trace..."
-cast call --rpc-url http://localhost:8546 $LEAF_MAILBOX "process(bytes,bytes)" "0x" $MESSAGE --trace
+cast call --rpc-url http://localhost:8546 $HYPERLANE_LEAF_PLUGIN "process(bytes,bytes)" "0x" $MESSAGE --trace
 
 # If we still want to send it
 echo "Processing message..."
-cast send --rpc-url http://localhost:8546 $LEAF_MAILBOX "process(bytes,bytes)" "0x" $MESSAGE --private-key $PRIVATE_KEY 
+cast send --rpc-url http://localhost:8546 $HYPERLANE_LEAF_PLUGIN "process(bytes,bytes)" "0x" $MESSAGE --private-key $PRIVATE_KEY 

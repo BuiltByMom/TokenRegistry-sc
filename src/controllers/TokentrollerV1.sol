@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./interfaces/ITokentroller.sol";
-import "./interfaces/ITokenRegistry.sol";
-import "./TokenRegistry.sol";
-import "./TokenMetadata.sol";
-import "./TokenEdits.sol";
+import "../interfaces/ITokentroller.sol";
+import "../interfaces/ITokenRegistry.sol";
+import "../TokenRegistry.sol";
+import "../TokenMetadata.sol";
+import "../TokenEdits.sol";
 
 contract TokentrollerV1 is ITokentroller {
     address public tokenRegistry;

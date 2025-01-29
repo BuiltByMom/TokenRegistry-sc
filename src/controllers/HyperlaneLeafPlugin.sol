@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../TokentrollerV1.sol";
+import "./TokentrollerV1.sol";
 import "@hyperlane-xyz/core/interfaces/IMailbox.sol";
 
-contract TokentrollerLeaf is TokentrollerV1 {
-    address public tokentrollerRoot;
+contract HyperlaneLeafPlugin is TokentrollerV1 {
+    address public root;
 
     // Hyperlane mailbox contract
     IMailbox public immutable mailbox;
@@ -16,17 +16,18 @@ contract TokentrollerLeaf is TokentrollerV1 {
     // Current message context
     address private currentSender;
     uint256 private currentSourceChain;
+    bytes32 private currentMessageId;
 
     event CrossChainMessageExecuted(bytes32 indexed messageId, bytes message);
     event CrossChainMessageFailed(bytes32 indexed messageId, string reason);
 
-    constructor(address _owner, address _tokentrollerRoot, address _mailbox) TokentrollerV1(_owner) {
-        tokentrollerRoot = _tokentrollerRoot;
+    constructor(address _owner, address _root, address _mailbox) TokentrollerV1(_owner) {
+        root = _root;
         mailbox = IMailbox(_mailbox);
     }
 
     modifier onlyFromRoot() {
-        require(messageSender() == tokentrollerRoot, "Only root tokentroller can call");
+        require(messageSender() == root, "Only root can call");
         _;
     }
 
@@ -53,6 +54,7 @@ contract TokentrollerLeaf is TokentrollerV1 {
         // Set message context
         currentSourceChain = _origin;
         currentSender = address(uint160(uint256(_sender)));
+        currentMessageId = keccak256(_message);
 
         // Add revert reason
         (bool success, bytes memory returnData) = address(this).call(_message);
@@ -61,6 +63,7 @@ contract TokentrollerLeaf is TokentrollerV1 {
         // Clear context
         currentSender = address(0);
         currentSourceChain = 0;
+        currentMessageId = bytes32(0);
     }
 
     // Override parent functions to restrict them
@@ -75,18 +78,18 @@ contract TokentrollerLeaf is TokentrollerV1 {
     // Cross-chain message handlers
     function executeApproveToken(address token) external onlyFromRoot crossChainContext {
         try TokenRegistry(tokenRegistry).approveToken(token) {
-            emit CrossChainMessageExecuted(0, msg.data);
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
         } catch Error(string memory reason) {
-            emit CrossChainMessageFailed(0, reason);
+            emit CrossChainMessageFailed(currentMessageId, reason);
             revert(reason);
         }
     }
 
     function executeRejectToken(address token, string calldata reason) external onlyFromRoot crossChainContext {
         try TokenRegistry(tokenRegistry).rejectToken(token, reason) {
-            emit CrossChainMessageExecuted(0, msg.data);
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
         } catch Error(string memory revertReason) {
-            emit CrossChainMessageFailed(0, revertReason);
+            emit CrossChainMessageFailed(currentMessageId, revertReason);
             revert(revertReason);
         }
     }

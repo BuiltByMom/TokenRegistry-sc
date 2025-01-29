@@ -2,25 +2,25 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import "../src/bridge/TokentrollerRoot.sol";
+import "../src/controllers/HyperlaneRootPlugin.sol";
 
-contract DeployTokentrollerRoot is Script {
-    address public tokentrollerRoot;
+contract DeployHyperlaneRootPlugin is Script {
+    address public hyperlaneRootPlugin;
 
     function run() external {
         // Load deployer key and addresses
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address owner = vm.addr(deployerPrivateKey);
 
-        address rootMailbox = vm.envAddress("ROOT_MAILBOX");
+        address rootMailbox = vm.envAddress("HYPERLANE_ROOT_MAILBOX");
 
         vm.startBroadcast(deployerPrivateKey);
 
-        TokentrollerRoot root = new TokentrollerRoot(owner, rootMailbox);
-        tokentrollerRoot = address(root);
+        HyperlaneRootPlugin root = new HyperlaneRootPlugin(owner, rootMailbox);
+        hyperlaneRootPlugin = address(root);
 
         console.log("Deployments on root chain: ", block.chainid);
-        console.log("Root Tokentroller:", tokentrollerRoot);
+        console.log("Root Plugin:", hyperlaneRootPlugin);
 
         vm.stopBroadcast();
     }

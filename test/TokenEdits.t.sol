@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "src/TokenEdits.sol";
 import "src/TokenRegistry.sol";
-import "src/TokentrollerV1.sol";
+import "src/controllers/TokentrollerV1.sol";
 import "./mocks/MockERC20.sol";
 import "src/interfaces/ITokenEdits.sol";
 

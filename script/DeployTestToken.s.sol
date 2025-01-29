@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Script.sol";
 import "../test/mocks/MockERC20.sol";
 import "../src/TokenRegistry.sol";
-import "../src/bridge/TokentrollerLeaf.sol";
+import "../src/controllers/HyperlaneLeafPlugin.sol";
 
 contract TestTokenDeployment is MockERC20 {
     constructor() MockERC20("Test Token", "TEST", 18) {}
@@ -15,7 +15,7 @@ contract DeployTestToken is Script {
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address tokentrollerLeaf = vm.envAddress("TOKENTROLLER_LEAF");
+        address hyperlaneLeafPlugin = vm.envAddress("HYPERLANE_LEAF_PLUGIN");
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -25,7 +25,7 @@ contract DeployTestToken is Script {
         console.log("Deployed Test Token at:", address(token));
 
         // Get TokenRegistry from leaf tokentroller
-        TokentrollerLeaf leaf = TokentrollerLeaf(tokentrollerLeaf);
+        HyperlaneLeafPlugin leaf = HyperlaneLeafPlugin(hyperlaneLeafPlugin);
         address registry = leaf.tokenRegistry();
         console.log("TokenRegistry at:", registry);
 
