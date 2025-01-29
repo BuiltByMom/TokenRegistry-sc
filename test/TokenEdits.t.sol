@@ -6,7 +6,7 @@ import "forge-std/console.sol";
 import "src/TokenEdits.sol";
 import "src/TokenRegistry.sol";
 import "src/TokentrollerV1.sol";
-import "test/MockERC20.sol";
+import "./mocks/MockERC20.sol";
 import "src/interfaces/ITokenEdits.sol";
 
 contract TokenEditsTest is Test {

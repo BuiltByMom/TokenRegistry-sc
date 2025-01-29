@@ -101,7 +101,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing approval
      * @return bool Returns true if the token can be approved, false otherwise
      *********************************************************************************************/
-    function canApproveToken(address sender, address contractAddress) public view returns (bool) {
+    function canApproveToken(address sender, address contractAddress) public view virtual returns (bool) {
         return sender == owner;
     }
 
@@ -113,7 +113,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice It should implement any necessary checks before allowing rejection
      * @return bool Returns true if the token can be rejected, false otherwise
      *********************************************************************************************/
-    function canRejectToken(address sender, address contractAddress) public view returns (bool) {
+    function canRejectToken(address sender, address contractAddress) public view virtual returns (bool) {
         return sender == owner;
     }
 
