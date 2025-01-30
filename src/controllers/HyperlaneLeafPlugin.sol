@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./TokentrollerV1.sol";
-import "@hyperlane-xyz/core/interfaces/IMailbox.sol";
+import "@hyperlane/interfaces/IMailbox.sol";
 
 contract HyperlaneLeafPlugin is TokentrollerV1 {
     address public root;
@@ -164,28 +164,6 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
         } catch Error(string memory reason) {
             emit CrossChainMessageFailed(currentMessageId, reason);
             revert(reason);
-        }
-    }
-
-    function executeAcceptMetadataEdit(address token, uint256 editId) external onlyFromRoot crossChainContext {
-        try TokenEdits(tokenEdits).acceptEdit(token, editId) {
-            emit CrossChainMessageExecuted(currentMessageId, msg.data);
-        } catch Error(string memory reason) {
-            emit CrossChainMessageFailed(currentMessageId, reason);
-            revert(reason);
-        }
-    }
-
-    function executeRejectMetadataEdit(
-        address token,
-        uint256 editId,
-        string calldata reason
-    ) external onlyFromRoot crossChainContext {
-        try TokenEdits(tokenEdits).rejectEdit(token, editId, reason) {
-            emit CrossChainMessageExecuted(currentMessageId, msg.data);
-        } catch Error(string memory revertReason) {
-            emit CrossChainMessageFailed(currentMessageId, revertReason);
-            revert(revertReason);
         }
     }
 }

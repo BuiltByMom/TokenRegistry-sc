@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import "./TokentrollerV1.sol";
-import "@hyperlane-xyz/core/interfaces/IMailbox.sol";
+import "@hyperlane/interfaces/IMailbox.sol";
+import "@hyperlane/hooks/libs/StandardHookMetadata.sol";
 
 contract HyperlaneRootPlugin is TokentrollerV1 {
     // Hyperlane mailbox contract
@@ -21,16 +22,44 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
     event CrossChainTokenEditRejected(uint256 indexed chainId, address indexed token, uint256 indexed editId);
     event CrossChainMetadataFieldAdded(uint256 indexed chainId, string indexed name);
     event CrossChainMetadataFieldUpdated(uint256 indexed chainId, string indexed name, bool isActive, bool isRequired);
-    event CrossChainMetadataEditAccepted(uint256 indexed chainId, address indexed token, uint256 indexed editId);
-    event CrossChainMetadataEditRejected(uint256 indexed chainId, address indexed token, uint256 indexed editId);
 
     constructor(address _owner, address _mailbox) TokentrollerV1(_owner) {
         mailbox = IMailbox(_mailbox);
     }
 
+    function quote(uint256 destinationDomain, bytes calldata messageBody) external view returns (uint256) {
+        bytes memory metadata = StandardHookMetadata.formatMetadata({
+            _msgValue: 0,
+            _gasLimit: 300000, // Standard gas limit, adjust if needed
+            _refundAddress: msg.sender,
+            _customMetadata: ""
+        });
+
+        return
+            mailbox.quoteDispatch({
+                destinationDomain: uint32(destinationDomain),
+                recipientAddress: bytes32(uint256(uint160(address(this)))),
+                messageBody: messageBody,
+                defaultHookMetadata: metadata
+            });
+    }
+
     function sendMessage(uint256 destinationChainId, address target, bytes memory message) internal {
         bytes32 recipient = bytes32(uint256(uint160(target)));
-        bytes32 messageId = mailbox.dispatch(uint32(destinationChainId), recipient, message);
+
+        bytes memory metadata = StandardHookMetadata.formatMetadata({
+            _msgValue: msg.value,
+            _gasLimit: 300000, // Standard gas limit, adjust if needed
+            _refundAddress: msg.sender,
+            _customMetadata: ""
+        });
+
+        bytes32 messageId = mailbox.dispatch{ value: msg.value }(
+            uint32(destinationChainId),
+            recipient,
+            message,
+            metadata
+        );
 
         emit MessageSent(messageId, uint32(destinationChainId), recipient, message);
     }
@@ -43,7 +72,7 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
     }
 
     // Cross-chain token approval
-    function approveTokenOnLeaf(uint256 chainId, address token) external {
+    function approveTokenOnLeaf(uint256 chainId, address token) external payable {
         require(msg.sender == owner, "Only owner can approve tokens");
         require(leafs[chainId] != address(0), "Leaf not set");
 
@@ -55,7 +84,7 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
     }
 
     // Cross-chain token rejection
-    function rejectTokenOnLeaf(uint256 chainId, address token, string calldata reason) external {
+    function rejectTokenOnLeaf(uint256 chainId, address token, string calldata reason) external payable {
         require(msg.sender == owner, "Only owner can reject tokens");
         require(leafs[chainId] != address(0), "Leaf not set");
 
@@ -67,7 +96,7 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
     }
 
     // Cross-chain token edit acceptance
-    function acceptTokenEditOnLeaf(uint256 chainId, address token, uint256 editId) external {
+    function acceptTokenEditOnLeaf(uint256 chainId, address token, uint256 editId) external payable {
         require(msg.sender == owner, "Only owner can accept token edits");
         require(leafs[chainId] != address(0), "Leaf not set");
 
@@ -79,7 +108,7 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
     }
 
     // Cross-chain token edit rejection
-    function rejectTokenEditOnLeaf(uint256 chainId, address token, uint256 editId) external {
+    function rejectTokenEditOnLeaf(uint256 chainId, address token, uint256 editId) external payable {
         require(msg.sender == owner, "Only owner can reject token edits");
         require(leafs[chainId] != address(0), "Leaf not set");
 
@@ -90,7 +119,7 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
         emit CrossChainTokenEditRejected(chainId, token, editId);
     }
 
-    function addMetadataFieldOnLeaf(uint256 chainId, string calldata name) external {
+    function addMetadataFieldOnLeaf(uint256 chainId, string calldata name) external payable {
         require(msg.sender == owner, "Only owner can add metadata fields");
         require(leafs[chainId] != address(0), "Leaf not set");
 
@@ -101,7 +130,12 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
         emit CrossChainMetadataFieldAdded(chainId, name);
     }
 
-    function updateMetadataFieldOnLeaf(uint256 chainId, string calldata name, bool isActive, bool isRequired) external {
+    function updateMetadataFieldOnLeaf(
+        uint256 chainId,
+        string calldata name,
+        bool isActive,
+        bool isRequired
+    ) external payable {
         require(msg.sender == owner, "Only owner can update metadata fields");
         require(leafs[chainId] != address(0), "Leaf not set");
 
@@ -115,29 +149,5 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
         sendMessage(chainId, leafs[chainId], message);
 
         emit CrossChainMetadataFieldUpdated(chainId, name, isActive, isRequired);
-    }
-
-    // Cross-chain metadata edit acceptance
-    function acceptMetadataEditOnLeaf(uint256 chainId, address token, uint256 editId) external {
-        require(msg.sender == owner, "Only owner can accept metadata edits");
-        require(leafs[chainId] != address(0), "Leaf not set");
-
-        bytes memory message = abi.encodeWithSignature("executeAcceptMetadataEdit(address,uint256)", token, editId);
-
-        sendMessage(chainId, leafs[chainId], message);
-
-        emit CrossChainMetadataEditAccepted(chainId, token, editId);
-    }
-
-    // Cross-chain metadata edit rejection
-    function rejectMetadataEditOnLeaf(uint256 chainId, address token, uint256 editId) external {
-        require(msg.sender == owner, "Only owner can reject metadata edits");
-        require(leafs[chainId] != address(0), "Leaf not set");
-
-        bytes memory message = abi.encodeWithSignature("executeRejectMetadataEdit(address,uint256)", token, editId);
-
-        sendMessage(chainId, leafs[chainId], message);
-
-        emit CrossChainMetadataEditRejected(chainId, token, editId);
     }
 }

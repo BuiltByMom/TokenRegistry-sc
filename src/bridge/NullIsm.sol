@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@hyperlane-xyz/core/interfaces/IInterchainSecurityModule.sol";
+import "@hyperlane/interfaces/IInterchainSecurityModule.sol";
 
 contract NullIsm is IInterchainSecurityModule {
     uint8 public constant moduleType = uint8(Types.NULL);
