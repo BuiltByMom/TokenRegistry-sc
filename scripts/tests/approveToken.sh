@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Load environment variables
-source .env.test
+source .env.local
 
 ROOT_CHAIN_ID=$(cast chain-id --rpc-url $HYPERLANE_ROOT_RPC)
 LEAF_CHAIN_ID=$(cast chain-id --rpc-url $HYPERLANE_LEAF_RPC)
@@ -47,7 +47,7 @@ echo "Padded address: ${PADDED_ADDRESS}"
 echo "Final message: ${MESSAGE}"
 
 # Get quote for cross-chain message
-QUOTE=$(cast call --rpc-url $HYPERLANE_ROOT_RPC $HYPERLANE_ROOT_PLUGIN "quote(uint256,bytes)" $LEAF_CHAIN_ID $MESSAGE)
+QUOTE=$(cast call --rpc-url $HYPERLANE_ROOT_RPC $HYPERLANE_ROOT_PLUGIN "quote(uint256,bytes,uint256)" $LEAF_CHAIN_ID $MESSAGE 0)
 QUOTE_DEC=$(cast --to-dec $QUOTE)
 echo "Quote for cross-chain message: $QUOTE_DEC"
 

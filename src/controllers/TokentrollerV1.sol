@@ -42,7 +42,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice The new tokentroller address must not be zero or the current contract address
      * @notice Calls the updateTokentroller function in the TokenRegistry contract
      *********************************************************************************************/
-    function updateRegistryTokentroller(address newTokentroller) public {
+    function updateRegistryTokentroller(address newTokentroller) external virtual {
         require(msg.sender == owner, "Only the owner can call this function");
         require(newTokentroller != address(0), "New tokentroller address cannot be zero");
         require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
@@ -57,7 +57,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice The new tokentroller address must not be zero or the current contract address
      * @notice Calls the updateTokentroller function in the TokenMetadata contract
      *********************************************************************************************/
-    function updateMetadataTokentroller(address newTokentroller) public {
+    function updateMetadataTokentroller(address newTokentroller) external virtual {
         require(msg.sender == owner, "Only the owner can call this function");
         require(newTokentroller != address(0), "New tokentroller address cannot be zero");
         require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
@@ -71,7 +71,7 @@ contract TokentrollerV1 is ITokentroller {
      * @notice The new owner address must not be zero
      * @notice Emits an OwnerUpdated event upon successful update
      *********************************************************************************************/
-    function updateOwner(address newOwner) public {
+    function updateOwner(address newOwner) external virtual {
         require(msg.sender == owner, "Only the owner can call this function");
         require(newOwner != address(0), "New owner address cannot be zero");
         require(newOwner != owner, "New owner must be different from current owner");

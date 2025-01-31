@@ -6,7 +6,7 @@ fs_permissions = [{ access = "read-write", path = "./"}]
 remappings = [
     "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/",
     "forge-std/=lib/forge-std/src/",
-    "@hyperlane-xyz/core/=lib/hyperlane-monorepo/solidity/contracts/"
+    "@hyperlane/=lib/hyperlane-monorepo/solidity/contracts/",
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

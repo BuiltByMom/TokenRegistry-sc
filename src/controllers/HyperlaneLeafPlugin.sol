@@ -105,6 +105,30 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
     }
 
     // Cross-chain message handlers
+    function updateRegistryTokentroller(address newTokentroller) external override onlyFromRoot crossChainContext {
+        require(newTokentroller != address(0), "New tokentroller address cannot be zero");
+        require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
+
+        try TokenRegistry(tokenRegistry).updateTokentroller(newTokentroller) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory reason) {
+            emit CrossChainMessageFailed(currentMessageId, reason);
+            revert(reason);
+        }
+    }
+
+    function updateMetadataTokentroller(address newTokentroller) external override onlyFromRoot crossChainContext {
+        require(newTokentroller != address(0), "New tokentroller address cannot be zero");
+        require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
+
+        try TokenMetadata(tokenMetadata).updateTokentroller(newTokentroller) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory reason) {
+            emit CrossChainMessageFailed(currentMessageId, reason);
+            revert(reason);
+        }
+    }
+
     function executeApproveToken(address token) external onlyFromRoot crossChainContext {
         try TokenRegistry(tokenRegistry).approveToken(token) {
             emit CrossChainMessageExecuted(currentMessageId, msg.data);
