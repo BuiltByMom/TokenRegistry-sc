@@ -39,12 +39,13 @@ contract UploadTokensScript is Script {
 
         console.log("Found %d tokens to upload", tokenCount);
 
-        address tokenRegistryAddress = vm.envAddress("TOKEN_REGISTRY_ADDRESS");
         address tokentrollerAddress = vm.envAddress("TOKENTROLLER_ADDRESS");
         address owner = vm.envAddress("INITIAL_OWNER");
 
-        TokenRegistry registry = TokenRegistry(tokenRegistryAddress);
         TokentrollerV1 tokentroller = TokentrollerV1(tokentrollerAddress);
+        address tokenRegistryAddress = tokentroller.tokenRegistry();
+
+        TokenRegistry registry = TokenRegistry(tokenRegistryAddress);
 
         console.log("Registry address:", tokenRegistryAddress);
         console.log("Tokentroller address:", tokentrollerAddress);
