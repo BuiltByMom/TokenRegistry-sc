@@ -6,6 +6,7 @@ import "./ISharedTypes.sol";
 interface ITokenEdits {
     struct TokenEdit {
         address token;
+        uint256[] editIds;
         MetadataInput[][] updates;
     }
 
@@ -17,7 +18,9 @@ interface ITokenEdits {
     function acceptEdit(address contractAddress, uint256 editIndex) external;
     function rejectEdit(address contractAddress, uint256 editIndex, string calldata reason) external;
     function getTokensWithEditsCount() external view returns (uint256);
-    function getTokenEdits(address token) external view returns (MetadataInput[][] memory);
+    function getTokenEdits(
+        address token
+    ) external view returns (uint256[] memory editIds, MetadataInput[][] memory updates);
     function getEditCount(address token) external view returns (uint256);
     function listEdits(
         uint256 initialIndex,
