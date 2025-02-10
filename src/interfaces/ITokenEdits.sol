@@ -13,6 +13,7 @@ interface ITokenEdits {
     event EditProposed(address indexed contractAddress, address indexed submitter, MetadataInput[] metadata);
     event EditAccepted(address indexed contractAddress, uint256 editIndex);
     event EditRejected(address indexed contractAddress, uint256 editIndex, string reason);
+    event TokentrollerUpdated(address indexed newTokentroller);
 
     function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external;
     function acceptEdit(address contractAddress, uint256 editIndex) external;

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Load environment variables
-source .env.local
+source .env.test
 
 export HYPERLANE_LEAF_PLUGIN
 export HYPERLANE_LEAF_RPC
