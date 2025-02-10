@@ -3,6 +3,9 @@ pragma solidity ^0.8.0;
 
 import "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+/// @title MockERC20
+/// @author TokenRegistry
+/// @notice A mock ERC20 token for testing purposes
 contract MockERC20 is IERC20Metadata {
     string private _name;
     string private _symbol;

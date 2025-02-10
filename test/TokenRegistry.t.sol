@@ -4,10 +4,11 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "src/TokenRegistry.sol";
-import "src/TokentrollerV1.sol";
+import "src/controllers/TokentrollerV1.sol";
 import "src/interfaces/ITokenRegistry.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "test/MockERC20.sol";
+import "./mocks/MockERC20.sol";
+
 contract TokenRegistryTest is Test {
     TokenRegistry tokenRegistry;
     TokentrollerV1 tokentroller;

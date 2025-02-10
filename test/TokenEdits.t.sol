@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "src/TokenEdits.sol";
 import "src/TokenRegistry.sol";
-import "src/TokentrollerV1.sol";
-import "test/MockERC20.sol";
+import "src/controllers/TokentrollerV1.sol";
+import "./mocks/MockERC20.sol";
 import "src/interfaces/ITokenEdits.sol";
 
 contract TokenEditsTest is Test {
@@ -48,9 +48,10 @@ contract TokenEditsTest is Test {
         vm.stopPrank();
 
         // Check that the edit is stored
-        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
-        assertEq(storedEdits[0][0].field, "logoURI", "Logo URI field should be stored");
-        assertEq(storedEdits[0][0].value, "https://example.com/new_logo.png", "Logo URI value should be stored");
+        (uint256[] memory editIds, MetadataInput[][] memory updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(updates[0][0].field, "logoURI", "Logo URI field should be stored");
+        assertEq(updates[0][0].value, "https://example.com/new_logo.png", "Logo URI value should be stored");
+        assertEq(editIds[0], 1, "Edit ID should be 1");
         assertEq(tokenEdits.getEditCount(address(token)), 1, "Edit count should be 1");
     }
 
@@ -94,10 +95,10 @@ contract TokenEditsTest is Test {
         vm.stopPrank();
 
         // Verify token was updated and edits were cleared
+        (uint256[] memory editIds, MetadataInput[][] memory updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(editIds.length, 0, "Edit should be cleared");
+        assertEq(updates.length, 0, "Updates should be cleared");
         assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be reset");
-        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
-        assertEq(storedEdits.length, 0, "All edits should be cleared");
-
         assertEq(tokenRegistry.getToken(address(token)).logoURI, "https://example.com/new_logo.png");
     }
 
@@ -126,8 +127,9 @@ contract TokenEditsTest is Test {
         vm.stopPrank();
 
         // Verify edit was cleared
-        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
-        assertEq(storedEdits.length, 0, "Edit should be cleared");
+        (uint256[] memory editIds, MetadataInput[][] memory updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(editIds.length, 0, "Edit should be cleared");
+        assertEq(updates.length, 0, "Updates should be cleared");
         assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be 0");
     }
 
@@ -177,8 +179,9 @@ contract TokenEditsTest is Test {
         vm.stopPrank();
 
         // Verify edit was cleared
-        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
-        assertEq(storedEdits.length, 0, "Edit should be cleared");
+        (uint256[] memory editIds, MetadataInput[][] memory updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(editIds.length, 0, "Edit should be cleared");
+        assertEq(updates.length, 0, "Updates should be cleared");
         assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be 0");
     }
 
@@ -237,8 +240,9 @@ contract TokenEditsTest is Test {
         vm.stopPrank();
 
         // Verify all edits were cleared
-        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
-        assertEq(storedEdits.length, 0, "All edits should be cleared");
+        (uint256[] memory editIds, MetadataInput[][] memory updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(editIds.length, 0, "All edits should be cleared");
+        assertEq(updates.length, 0, "All updates should be cleared");
         assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be reset");
     }
 
@@ -281,8 +285,9 @@ contract TokenEditsTest is Test {
         vm.stopPrank();
 
         // Verify all edits were cleared
-        MetadataInput[][] memory storedEdits = tokenEdits.getTokenEdits(address(token));
-        assertEq(storedEdits.length, 0, "All edits should be cleared");
+        (uint256[] memory editIds, MetadataInput[][] memory updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(editIds.length, 0, "All edits should be cleared");
+        assertEq(updates.length, 0, "All updates should be cleared");
         assertEq(tokenEdits.getEditCount(address(token)), 0, "Edit count should be reset");
     }
 
@@ -307,7 +312,9 @@ contract TokenEditsTest is Test {
 
         // Verify token is tracked
         assertEq(tokenEdits.getTokensWithEditsCount(), 1);
-        assertEq(tokenEdits.getTokenEdits(address(token))[0][0].value, "https://example.com/new_logo.png");
+        (uint256[] memory editIds, MetadataInput[][] memory updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(updates[0][0].value, "https://example.com/new_logo.png");
+        assertEq(editIds[0], 1);
         assertEq(tokenEdits.getEditCount(address(token)), 1);
 
         // Create second edit
@@ -319,6 +326,9 @@ contract TokenEditsTest is Test {
         // Verify tracking remains correct
         assertEq(tokenEdits.getTokensWithEditsCount(), 1);
         assertEq(tokenEdits.getEditCount(address(token)), 2);
+        (editIds, updates) = tokenEdits.getTokenEdits(address(token));
+        assertEq(editIds[1], 2);
+        assertEq(updates[1][0].value, "https://example.com/new_logo2.png");
     }
 
     function testListEdits() public {
@@ -346,12 +356,19 @@ contract TokenEditsTest is Test {
 
         // Verify basic structure
         assertEq(edits.length, 1);
-        assertEq(edits[0].updates.length, 2); // Should have both edits
+        assertEq(edits[0].editIds.length, 2); // Should have both edits
+        assertEq(edits[0].updates.length, 2);
         assertEq(total, 1); // One token with edits
 
+        // Verify token address
+        assertEq(edits[0].token, address(token));
+
         // Verify edit contents in chronological order
+        assertEq(edits[0].editIds[0], 1);
         assertEq(edits[0].updates[0][0].field, "logoURI");
         assertEq(edits[0].updates[0][0].value, "https://example.com/logo1.png"); // First edit
+
+        assertEq(edits[0].editIds[1], 2);
         assertEq(edits[0].updates[1][0].field, "logoURI");
         assertEq(edits[0].updates[1][0].value, "https://example.com/logo2.png"); // Second edit
 
@@ -359,5 +376,67 @@ contract TokenEditsTest is Test {
         (ITokenEdits.TokenEdit[] memory edits2, uint256 total2) = tokenEdits.listEdits(1, 1);
         assertEq(edits2.length, 0);
         assertEq(total2, 1);
+    }
+
+    function testCannotProposeEmptyMetadata() public {
+        // First add and approve a token
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(token), metadata);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        tokenRegistry.approveToken(address(token));
+        vm.stopPrank();
+
+        // Try to propose edit with empty array
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory emptyMetadata = new MetadataInput[](0);
+        vm.expectRevert("Empty metadata array");
+        tokenEdits.proposeEdit(address(token), emptyMetadata);
+        vm.stopPrank();
+    }
+
+    function testCannotProposeEmptyField() public {
+        // First add and approve a token
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(token), metadata);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        tokenRegistry.approveToken(address(token));
+        vm.stopPrank();
+
+        // Try to propose edit with empty field
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory badMetadata = new MetadataInput[](1);
+        badMetadata[0] = MetadataInput({ field: "", value: "https://example.com/new_logo.png" });
+        vm.expectRevert("Empty field name");
+        tokenEdits.proposeEdit(address(token), badMetadata);
+        vm.stopPrank();
+    }
+
+    function testCannotProposeEmptyValue() public {
+        // First add and approve a token
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory metadata = new MetadataInput[](1);
+        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
+        tokenRegistry.addToken(address(token), metadata);
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        tokenRegistry.approveToken(address(token));
+        vm.stopPrank();
+
+        // Try to propose edit with empty value
+        vm.startPrank(nonOwner);
+        MetadataInput[] memory badMetadata = new MetadataInput[](1);
+        badMetadata[0] = MetadataInput({ field: "logoURI", value: "" });
+        vm.expectRevert("Empty value");
+        tokenEdits.proposeEdit(address(token), badMetadata);
+        vm.stopPrank();
     }
 }

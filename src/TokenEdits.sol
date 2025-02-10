@@ -40,9 +40,13 @@ contract TokenEdits is ITokenEdits {
             "Not authorized to propose edit"
         );
 
+        require(metadata.length > 0, "Empty metadata array");
+
         uint256 editId = ++nextEditId;
         MetadataInput[] storage editArray = edits[contractAddress][editId];
         for (uint256 i = 0; i < metadata.length; i++) {
+            require(bytes(metadata[i].field).length > 0, "Empty field name");
+            require(bytes(metadata[i].value).length > 0, "Empty value");
             editArray.push(metadata[i]);
         }
 
@@ -103,14 +107,17 @@ contract TokenEdits is ITokenEdits {
         return tokensWithEdits.length();
     }
 
-    function getTokenEdits(address token) external view returns (MetadataInput[][] memory) {
+    function getTokenEdits(
+        address token
+    ) external view returns (uint256[] memory editIds, MetadataInput[][] memory updates) {
         uint256[] memory activeIds = EnumerableSet.values(tokenActiveEdits[token]);
-        MetadataInput[][] memory result = new MetadataInput[][](activeIds.length);
+        editIds = activeIds;
+        updates = new MetadataInput[][](activeIds.length);
 
         for (uint256 i = 0; i < activeIds.length; i++) {
-            result[i] = edits[token][activeIds[i]];
+            updates[i] = edits[token][activeIds[i]];
         }
-        return result;
+        return (editIds, updates);
     }
 
     function getEditCount(address token) public view returns (uint256) {
@@ -121,14 +128,14 @@ contract TokenEdits is ITokenEdits {
         uint256 initialIndex,
         uint256 size
     ) external view returns (TokenEdit[] memory tokenEdits, uint256 total) {
-        uint256 totalTokens = tokensWithEdits.length();
-        if (initialIndex >= totalTokens) {
-            return (new TokenEdit[](0), totalTokens);
+        total = tokensWithEdits.length();
+        if (initialIndex >= total) {
+            return (new TokenEdit[](0), total);
         }
 
         uint256 endIndex = initialIndex + size;
-        if (endIndex > totalTokens) {
-            endIndex = totalTokens;
+        if (endIndex > total) {
+            endIndex = total;
         }
 
         TokenEdit[] memory result = new TokenEdit[](endIndex - initialIndex);
@@ -142,10 +149,10 @@ contract TokenEdits is ITokenEdits {
                 tokenUpdates[j] = edits[token][activeIds[j]];
             }
 
-            result[i - initialIndex] = TokenEdit({ token: token, updates: tokenUpdates });
+            result[i - initialIndex] = TokenEdit({ token: token, editIds: activeIds, updates: tokenUpdates });
         }
 
-        return (result, totalTokens);
+        return (result, total);
     }
 
     function updateTokentroller(address newTokentroller) external {
