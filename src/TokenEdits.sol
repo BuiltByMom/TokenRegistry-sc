@@ -64,7 +64,7 @@ contract TokenEdits is ITokenEdits {
      * @notice The metadata array cannot be empty and must contain valid fields and values
      * @notice Emits an EditProposed event on success
      *********************************************************************************************/
-    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external {
+    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external returns (uint256) {
         require(
             ITokentroller(tokentroller).canProposeTokenEdit(msg.sender, contractAddress),
             "Not authorized to propose edit"
@@ -85,6 +85,8 @@ contract TokenEdits is ITokenEdits {
         tokensWithEdits.set(contractAddress, currentCount + 1);
 
         emit EditProposed(contractAddress, msg.sender, metadata);
+
+        return editId;
     }
 
     /**********************************************************************************************

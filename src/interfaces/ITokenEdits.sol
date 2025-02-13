@@ -15,7 +15,7 @@ interface ITokenEdits {
     event EditRejected(address indexed contractAddress, uint256 editIndex, string reason);
     event TokentrollerUpdated(address indexed newTokentroller);
 
-    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external;
+    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external returns (uint256);
     function acceptEdit(address contractAddress, uint256 editIndex) external;
     function rejectEdit(address contractAddress, uint256 editIndex, string calldata reason) external;
     function getTokensWithEditsCount() external view returns (uint256);

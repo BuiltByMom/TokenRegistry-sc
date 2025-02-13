@@ -4,6 +4,8 @@ import "./ISharedTypes.sol";
 
 interface ITokentroller {
     event OwnerUpdated(address indexed oldOwner, address indexed newOwner);
+    event TrustedHelperAdded(address indexed helper);
+    event TrustedHelperRemoved(address indexed helper);
 
     function canApproveToken(address sender, address contractAddress) external view returns (bool);
     function canRejectToken(address sender, address contractAddress) external view returns (bool);
@@ -28,4 +30,10 @@ interface ITokentroller {
     ) external view returns (bool);
 
     function canUpdateMetadata(address sender, address contractAddress) external view returns (bool);
+
+    function updateOwner(address newOwner) external;
+    function updateMetadataTokentroller(address newTokentroller) external;
+    function updateRegistryTokentroller(address newTokentroller) external;
+    function addTrustedHelper(address helper) external;
+    function removeTrustedHelper(address helper) external;
 }
