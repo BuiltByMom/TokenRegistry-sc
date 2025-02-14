@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./ISharedTypes.sol";
 
@@ -18,6 +18,7 @@ interface ITokenRegistry {
     event TokenApproved(address indexed contractAddress);
     event TokenRejected(address indexed contractAddress, string reason);
     event TokenUpdated(address indexed contractAddress);
+    event TokentrollerUpdated(address indexed newTokentroller);
 
     function addToken(address contractAddress, MetadataInput[] calldata metadata) external;
     function approveToken(address contractAddress) external;

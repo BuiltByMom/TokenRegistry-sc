@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 library Commands {
     uint256 public constant APPROVE_TOKEN = 0x00;

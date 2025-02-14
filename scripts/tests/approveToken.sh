@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Load environment variables
-source .env.local
+source .env.test
 
 ROOT_CHAIN_ID=$(cast chain-id --rpc-url $HYPERLANE_ROOT_RPC)
 LEAF_CHAIN_ID=$(cast chain-id --rpc-url $HYPERLANE_LEAF_RPC)

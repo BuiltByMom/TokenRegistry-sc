@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./ISharedTypes.sol";
 
@@ -13,8 +13,9 @@ interface ITokenEdits {
     event EditProposed(address indexed contractAddress, address indexed submitter, MetadataInput[] metadata);
     event EditAccepted(address indexed contractAddress, uint256 editIndex);
     event EditRejected(address indexed contractAddress, uint256 editIndex, string reason);
+    event TokentrollerUpdated(address indexed newTokentroller);
 
-    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external;
+    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external returns (uint256);
     function acceptEdit(address contractAddress, uint256 editIndex) external;
     function rejectEdit(address contractAddress, uint256 editIndex, string calldata reason) external;
     function getTokensWithEditsCount() external view returns (uint256);
