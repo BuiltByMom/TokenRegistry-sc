@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "../interfaces/ITokentroller.sol";
 import "../interfaces/ITokenRegistry.sol";
@@ -8,9 +8,9 @@ import "../TokenMetadata.sol";
 import "../TokenEdits.sol";
 
 contract TokentrollerV1 is ITokentroller {
-    address public tokenRegistry;
-    address public tokenEdits;
-    address public tokenMetadata;
+    address public immutable tokenRegistry;
+    address public immutable tokenEdits;
+    address public immutable tokenMetadata;
     address public owner;
 
     mapping(address => bool) public trustedHelpers;
@@ -20,6 +20,7 @@ contract TokentrollerV1 is ITokentroller {
      * @param _owner The address of the contract owner
      *********************************************************************************************/
     constructor(address _owner) {
+        require(_owner != address(0), "TokentrollerV1: owner cannot be zero address");
         owner = _owner;
         tokenMetadata = address(new TokenMetadata(address(this)));
         tokenRegistry = address(new TokenRegistry(address(this), tokenMetadata));
@@ -74,8 +75,8 @@ contract TokentrollerV1 is ITokentroller {
      * @notice Emits an OwnerUpdated event upon successful update
      *********************************************************************************************/
     function updateOwner(address newOwner) external virtual {
-        require(msg.sender == owner, "Only the owner can call this function");
-        require(newOwner != address(0), "New owner address cannot be zero");
+        require(msg.sender == owner, "Only owner can update");
+        require(newOwner != address(0), "TokentrollerV1: owner cannot be zero address");
         require(newOwner != owner, "New owner must be different from current owner");
         address oldOwner = owner;
         owner = newOwner;
