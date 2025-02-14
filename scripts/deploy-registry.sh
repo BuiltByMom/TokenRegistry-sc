@@ -6,6 +6,7 @@ export PRIVATE_KEY
 export INITIAL_OWNER
 export RPC_URL
 
+
 # Deploy token registry
 echo "Deploying Token Registry..."
 forge script script/TokenRegistry.s.sol:DeployTokenRegistry \

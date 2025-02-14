@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./interfaces/ITokenRegistry.sol";
 import "./interfaces/ITokentroller.sol";
@@ -8,6 +8,7 @@ import "./interfaces/ITokenEdits.sol";
 import "./interfaces/ITokenMetadata.sol";
 import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableMap.sol";
 import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+import "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 /**********************************************************************************************
  * @title TokenEdits
@@ -15,9 +16,9 @@ import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
  * This contract allows community members to propose changes to token metadata,
  * which can then be approved or rejected by governance.
  *********************************************************************************************/
-contract TokenEdits is ITokenEdits {
-    using EnumerableMap for EnumerableMap.AddressToUintMap;
+contract TokenEdits is ITokenEdits, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     // Sequential ID for edits
     uint256 private nextEditId;
@@ -28,12 +29,12 @@ contract TokenEdits is ITokenEdits {
     // Token => set of active edit IDs
     mapping(address => EnumerableSet.UintSet) private tokenActiveEdits;
 
-    // Token => number of active edits (for EnumerableMap compatibility)
-    EnumerableMap.AddressToUintMap private tokensWithEdits;
+    // Set of tokens that have active edits
+    EnumerableSet.AddressSet private tokensWithEdits;
 
     // Governance
     address public tokentroller;
-    address public tokenMetadata;
+    address public immutable tokenMetadata;
 
     /**********************************************************************************************
      * @dev Constructor for the TokenEdits contract
@@ -42,6 +43,8 @@ contract TokenEdits is ITokenEdits {
      * @notice Initializes the contract with the tokentroller and metadata contract addresses
      *********************************************************************************************/
     constructor(address _tokentroller, address _tokenMetadata) {
+        require(_tokentroller != address(0), "TokenEdits: tokentroller cannot be zero address");
+        require(_tokenMetadata != address(0), "TokenEdits: tokenMetadata cannot be zero address");
         tokentroller = _tokentroller;
         tokenMetadata = _tokenMetadata;
     }
@@ -64,7 +67,7 @@ contract TokenEdits is ITokenEdits {
      * @notice The metadata array cannot be empty and must contain valid fields and values
      * @notice Emits an EditProposed event on success
      *********************************************************************************************/
-    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external {
+    function proposeEdit(address contractAddress, MetadataInput[] calldata metadata) external returns (uint256) {
         require(
             ITokentroller(tokentroller).canProposeTokenEdit(msg.sender, contractAddress),
             "Not authorized to propose edit"
@@ -80,11 +83,19 @@ contract TokenEdits is ITokenEdits {
             editArray.push(metadata[i]);
         }
 
-        EnumerableSet.add(tokenActiveEdits[contractAddress], editId);
-        (, uint256 currentCount) = tokensWithEdits.tryGet(contractAddress);
-        tokensWithEdits.set(contractAddress, currentCount + 1);
+        // Add edit to active edits
+        bool added = EnumerableSet.add(tokenActiveEdits[contractAddress], editId);
+        require(added, "Failed to add edit to active edits");
+
+        // Add token to tracking set if not already tracked
+        if (!tokensWithEdits.contains(contractAddress)) {
+            bool success = tokensWithEdits.add(contractAddress);
+            require(success, "Failed to add token to tracking");
+        }
 
         emit EditProposed(contractAddress, msg.sender, metadata);
+
+        return editId;
     }
 
     /**********************************************************************************************
@@ -96,27 +107,33 @@ contract TokenEdits is ITokenEdits {
      * @notice Accepting an edit will clear all other pending edits for the token
      * @notice Emits an EditAccepted event on success
      *********************************************************************************************/
-    function acceptEdit(address contractAddress, uint256 editId) external {
+    function acceptEdit(address contractAddress, uint256 editId) external nonReentrant {
         require(
             ITokentroller(tokentroller).canAcceptTokenEdit(msg.sender, contractAddress, editId),
             "Not authorized to accept edit"
         );
-
         require(EnumerableSet.contains(tokenActiveEdits[contractAddress], editId), "Edit not found");
 
         MetadataInput[] memory metadata = edits[contractAddress][editId];
         require(metadata.length > 0, "Edit does not exist");
-
-        ITokenMetadata(tokenMetadata).updateMetadata(contractAddress, metadata);
 
         // Clear all edits for this token
         uint256[] memory activeIds = EnumerableSet.values(tokenActiveEdits[contractAddress]);
         for (uint256 i = 0; i < activeIds.length; i++) {
             uint256 id = activeIds[i];
             delete edits[contractAddress][id];
-            EnumerableSet.remove(tokenActiveEdits[contractAddress], id);
+            bool removed = EnumerableSet.remove(tokenActiveEdits[contractAddress], id);
+            require(removed, "Failed to remove edit");
         }
-        tokensWithEdits.remove(contractAddress);
+
+        bool exists = tokensWithEdits.contains(contractAddress);
+        require(exists, "Token not found in edit tracking");
+        bool success = tokensWithEdits.remove(contractAddress);
+        require(success, "Failed to remove token from edit tracking");
+
+        MetadataInput[] memory metadataToUpdate = metadata;
+
+        ITokenMetadata(tokenMetadata).updateMetadata(contractAddress, metadataToUpdate);
 
         emit EditAccepted(contractAddress, editId);
     }
@@ -139,13 +156,13 @@ contract TokenEdits is ITokenEdits {
         require(EnumerableSet.contains(tokenActiveEdits[contractAddress], editId), "Edit not found");
 
         delete edits[contractAddress][editId];
-        EnumerableSet.remove(tokenActiveEdits[contractAddress], editId);
+        bool removed = EnumerableSet.remove(tokenActiveEdits[contractAddress], editId);
+        require(removed, "Failed to remove edit");
 
-        (, uint256 currentCount) = tokensWithEdits.tryGet(contractAddress);
-        if (currentCount == 1) {
-            tokensWithEdits.remove(contractAddress);
-        } else {
-            tokensWithEdits.set(contractAddress, currentCount - 1);
+        // If this was the last edit, remove token from tracking
+        if (getEditCount(contractAddress) == 0) {
+            bool success = tokensWithEdits.remove(contractAddress);
+            require(success, "Failed to remove token from tracking");
         }
 
         emit EditRejected(contractAddress, editId, reason);
@@ -225,7 +242,7 @@ contract TokenEdits is ITokenEdits {
 
         TokenEdit[] memory result = new TokenEdit[](endIndex - initialIndex);
         for (uint256 i = initialIndex; i < endIndex; i++) {
-            (address token, ) = tokensWithEdits.at(i);
+            address token = tokensWithEdits.at(i);
 
             uint256[] memory activeIds = EnumerableSet.values(tokenActiveEdits[token]);
             MetadataInput[][] memory tokenUpdates = new MetadataInput[][](activeIds.length);
@@ -260,6 +277,7 @@ contract TokenEdits is ITokenEdits {
      *********************************************************************************************/
     function updateTokentroller(address newTokentroller) external {
         require(msg.sender == tokentroller, "Not authorized");
+        require(newTokentroller != address(0), "TokenEdits: tokentroller cannot be zero address");
         tokentroller = newTokentroller;
         emit TokentrollerUpdated(newTokentroller);
     }

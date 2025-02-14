@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./TokentrollerV1.sol";
 import "@hyperlane/interfaces/IMailbox.sol";
@@ -11,7 +11,7 @@ import "@hyperlane/interfaces/IMailbox.sol";
  * cross-chain system, receiving and executing commands from the root chain.
  *********************************************************************************************/
 contract HyperlaneLeafPlugin is TokentrollerV1 {
-    address public root;
+    address public immutable root;
 
     // Hyperlane mailbox contract for cross-chain messaging
     IMailbox public immutable mailbox;
@@ -51,6 +51,8 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
      * @param _mailbox The address of the Hyperlane mailbox contract
      *********************************************************************************************/
     constructor(address _owner, address _root, address _mailbox) TokentrollerV1(_owner) {
+        require(_root != address(0), "HyperlaneLeafPlugin: root cannot be zero address");
+        require(_mailbox != address(0), "HyperlaneLeafPlugin: mailbox cannot be zero address");
         root = _root;
         mailbox = IMailbox(_mailbox);
     }

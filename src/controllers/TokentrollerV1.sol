@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "../interfaces/ITokentroller.sol";
 import "../interfaces/ITokenRegistry.sol";
@@ -8,16 +8,19 @@ import "../TokenMetadata.sol";
 import "../TokenEdits.sol";
 
 contract TokentrollerV1 is ITokentroller {
-    address public tokenRegistry;
-    address public tokenEdits;
-    address public tokenMetadata;
+    address public immutable tokenRegistry;
+    address public immutable tokenEdits;
+    address public immutable tokenMetadata;
     address public owner;
+
+    mapping(address => bool) public trustedHelpers;
 
     /**********************************************************************************************
      * @dev Constructor for the Tokentroller contract
      * @param _owner The address of the contract owner
      *********************************************************************************************/
     constructor(address _owner) {
+        require(_owner != address(0), "TokentrollerV1: owner cannot be zero address");
         owner = _owner;
         tokenMetadata = address(new TokenMetadata(address(this)));
         tokenRegistry = address(new TokenRegistry(address(this), tokenMetadata));
@@ -72,12 +75,40 @@ contract TokentrollerV1 is ITokentroller {
      * @notice Emits an OwnerUpdated event upon successful update
      *********************************************************************************************/
     function updateOwner(address newOwner) external virtual {
-        require(msg.sender == owner, "Only the owner can call this function");
-        require(newOwner != address(0), "New owner address cannot be zero");
+        require(msg.sender == owner, "Only owner can update");
+        require(newOwner != address(0), "TokentrollerV1: owner cannot be zero address");
         require(newOwner != owner, "New owner must be different from current owner");
         address oldOwner = owner;
         owner = newOwner;
         emit OwnerUpdated(oldOwner, newOwner);
+    }
+
+    /**********************************************************************************************
+     * @dev Adds a trusted helper to the Tokentroller contract
+     * @param helper The address of the helper to be added
+     * @notice This function can only be called by the current owner
+     * @notice The helper address must not be zero
+     * @notice Emits a TrustedHelperAdded event upon successful addition
+     *********************************************************************************************/
+    function addTrustedHelper(address helper) external {
+        require(msg.sender == owner, "Only owner can add trusted helpers");
+        require(helper != address(0), "Helper address cannot be zero");
+        trustedHelpers[helper] = true;
+        emit TrustedHelperAdded(helper);
+    }
+
+    /**********************************************************************************************
+     * @dev Removes a trusted helper from the Tokentroller contract
+     * @param helper The address of the helper to be removed
+     * @notice This function can only be called by the current owner
+     * @notice The helper address must not be zero
+     * @notice Emits a TrustedHelperRemoved event upon successful removal
+     *********************************************************************************************/
+    function removeTrustedHelper(address helper) external {
+        require(msg.sender == owner, "Only owner can remove trusted helpers");
+        require(helper != address(0), "Helper address cannot be zero");
+        trustedHelpers[helper] = false;
+        emit TrustedHelperRemoved(helper);
     }
 
     /**********************************************************************************************
@@ -102,7 +133,7 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be approved, false otherwise
      *********************************************************************************************/
     function canApproveToken(address sender, address contractAddress) external view virtual returns (bool) {
-        return sender == owner;
+        return sender == owner || trustedHelpers[sender];
     }
 
     /**********************************************************************************************
@@ -114,7 +145,7 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the token can be rejected, false otherwise
      *********************************************************************************************/
     function canRejectToken(address sender, address contractAddress) external view virtual returns (bool) {
-        return sender == owner;
+        return sender == owner || trustedHelpers[sender];
     }
 
     /**********************************************************************************************
@@ -170,7 +201,7 @@ contract TokentrollerV1 is ITokentroller {
         address contractAddress,
         uint256 editId
     ) external view virtual returns (bool) {
-        return sender == owner;
+        return sender == owner || trustedHelpers[sender];
     }
 
     /**********************************************************************************************
@@ -187,7 +218,7 @@ contract TokentrollerV1 is ITokentroller {
         address contractAddress,
         uint256 editId
     ) external view virtual returns (bool) {
-        return sender == owner;
+        return sender == owner || trustedHelpers[sender];
     }
 
     /**********************************************************************************************
@@ -199,7 +230,7 @@ contract TokentrollerV1 is ITokentroller {
      * @return bool Returns true if the metadata field can be added, false otherwise
      *********************************************************************************************/
     function canAddMetadataField(address sender, string calldata name) external view virtual returns (bool) {
-        return sender == owner;
+        return sender == owner || trustedHelpers[sender];
     }
 
     /**********************************************************************************************
@@ -218,7 +249,7 @@ contract TokentrollerV1 is ITokentroller {
         bool isActive,
         bool isRequired
     ) external view virtual returns (bool) {
-        return sender == owner;
+        return sender == owner || trustedHelpers[sender];
     }
 
     /**********************************************************************************************
