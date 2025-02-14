@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/ITokenRegistry.sol";
 import "./interfaces/ITokentroller.sol";
 import "./interfaces/ITokenMetadata.sol";
@@ -14,12 +15,12 @@ import "./interfaces/ISharedTypes.sol";
  * This contract maintains a list of approved tokens and their status,
  * with governance controls for approving and rejecting token registrations.
  *********************************************************************************************/
-contract TokenRegistry is ITokenRegistry {
+contract TokenRegistry is ITokenRegistry, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     mapping(TokenStatus => EnumerableSet.AddressSet) private tokensByStatus;
 
-    ITokenMetadata public tokenMetadata;
+    ITokenMetadata public immutable tokenMetadata;
 
     address public tokentroller;
 
@@ -30,6 +31,8 @@ contract TokenRegistry is ITokenRegistry {
      * @notice Initializes the contract with the tokentroller and metadata contract addresses
      *********************************************************************************************/
     constructor(address _tokentroller, address _tokenMetadata) {
+        require(_tokentroller != address(0), "TokenRegistry: tokentroller cannot be zero address");
+        require(_tokenMetadata != address(0), "TokenRegistry: tokenMetadata cannot be zero address");
         tokentroller = _tokentroller;
         tokenMetadata = ITokenMetadata(_tokenMetadata);
     }
@@ -52,7 +55,7 @@ contract TokenRegistry is ITokenRegistry {
      * @notice The token must be a valid ERC20 token and not already registered
      * @notice Emits a TokenAdded event on success
      *********************************************************************************************/
-    function addToken(address contractAddress, MetadataInput[] calldata metadata) external {
+    function addToken(address contractAddress, MetadataInput[] calldata metadata) external nonReentrant {
         require(ITokentroller(tokentroller).canAddToken(msg.sender, contractAddress), "Not authorized to add token");
 
         // Verify it's a valid ERC20 token
@@ -69,11 +72,14 @@ contract TokenRegistry is ITokenRegistry {
 
         // Remove from rejected if exists
         if (tokensByStatus[TokenStatus.REJECTED].contains(contractAddress)) {
-            tokensByStatus[TokenStatus.REJECTED].remove(contractAddress);
+            bool removed = tokensByStatus[TokenStatus.REJECTED].remove(contractAddress);
+            require(removed, "Failed to remove from rejected status");
         }
 
+        bool added = tokensByStatus[TokenStatus.PENDING].add(contractAddress);
+        require(added, "Failed to add to pending status");
+
         tokenMetadata.updateMetadata(contractAddress, metadata);
-        tokensByStatus[TokenStatus.PENDING].add(contractAddress);
 
         emit TokenAdded(contractAddress, msg.sender);
     }
@@ -85,16 +91,18 @@ contract TokenRegistry is ITokenRegistry {
      * @notice The token must be in pending status
      * @notice Emits a TokenApproved event on success
      *********************************************************************************************/
-    function approveToken(address contractAddress) external {
+    function approveToken(address contractAddress) external nonReentrant {
         require(
             ITokentroller(tokentroller).canApproveToken(msg.sender, contractAddress),
             "Not authorized to approve token"
         );
-
         require(tokensByStatus[TokenStatus.PENDING].contains(contractAddress), "Token not found in pending state");
 
-        tokensByStatus[TokenStatus.PENDING].remove(contractAddress);
-        tokensByStatus[TokenStatus.APPROVED].add(contractAddress);
+        bool removed = tokensByStatus[TokenStatus.PENDING].remove(contractAddress);
+        require(removed, "Failed to remove from pending status");
+
+        bool added = tokensByStatus[TokenStatus.APPROVED].add(contractAddress);
+        require(added, "Failed to add to approved status");
 
         emit TokenApproved(contractAddress);
     }
@@ -107,15 +115,18 @@ contract TokenRegistry is ITokenRegistry {
      * @notice The token must not already be rejected
      * @notice Emits a TokenRejected event on success
      *********************************************************************************************/
-    function rejectToken(address contractAddress, string calldata reason) external {
+    function rejectToken(address contractAddress, string calldata reason) external nonReentrant {
         require(
             ITokentroller(tokentroller).canRejectToken(msg.sender, contractAddress),
             "Not authorized to reject token"
         );
         require(tokenStatus(contractAddress) != TokenStatus.REJECTED, "Token already rejected");
 
-        tokensByStatus[tokenStatus(contractAddress)].remove(contractAddress);
-        tokensByStatus[TokenStatus.REJECTED].add(contractAddress);
+        bool removed = tokensByStatus[tokenStatus(contractAddress)].remove(contractAddress);
+        require(removed, "Failed to remove from current status");
+
+        bool added = tokensByStatus[TokenStatus.REJECTED].add(contractAddress);
+        require(added, "Failed to add to rejected status");
 
         emit TokenRejected(contractAddress, reason);
     }
@@ -337,6 +348,7 @@ contract TokenRegistry is ITokenRegistry {
      *********************************************************************************************/
     function updateTokentroller(address newTokentroller) external {
         require(msg.sender == tokentroller, "Not authorized");
+        require(newTokentroller != address(0), "TokenRegistry: tokentroller cannot be zero address");
         tokentroller = newTokentroller;
         emit TokentrollerUpdated(newTokentroller);
     }

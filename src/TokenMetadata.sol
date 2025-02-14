@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./interfaces/ITokentroller.sol";
 import "./interfaces/ISharedTypes.sol";
@@ -26,6 +26,7 @@ contract TokenMetadata is ITokenMetadata {
      * @notice Initializes the contract with the tokentroller address and adds logoURI as required field
      *********************************************************************************************/
     constructor(address _tokentroller) {
+        require(_tokentroller != address(0), "TokenMetadata: tokentroller cannot be zero address");
         tokentroller = _tokentroller;
         // Add logoURI as initial required field
         _addField("logoURI", true);
@@ -237,6 +238,7 @@ contract TokenMetadata is ITokenMetadata {
      *********************************************************************************************/
     function updateTokentroller(address newTokentroller) external {
         require(msg.sender == tokentroller, "Only tokentroller can update");
+        require(newTokentroller != address(0), "TokenMetadata: tokentroller cannot be zero address");
         tokentroller = newTokentroller;
         emit TokentrollerUpdated(newTokentroller);
     }
