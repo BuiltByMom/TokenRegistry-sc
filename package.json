@@ -1,0 +1,19 @@
+{
+  "name": "token-registry",
+  "version": "1.0.0",
+  "description": "Token Registry Management Scripts",
+  "scripts": {
+    "build": "tsc",
+    "upload-tokens": "ts-node scripts/batch-upload-tokens.ts"
+  },
+  "dependencies": {
+    "viem": "^2.7.8",
+    "dotenv": "^16.4.4",
+    "axios": "^1.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
