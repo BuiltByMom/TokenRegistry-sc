@@ -36,4 +36,5 @@ interface ITokentroller {
     function updateRegistryTokentroller(address newTokentroller) external;
     function addTrustedHelper(address helper) external;
     function removeTrustedHelper(address helper) external;
+    function updateTokenEdits(address newTokenEdits) external;
 }

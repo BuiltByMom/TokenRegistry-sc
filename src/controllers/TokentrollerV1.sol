@@ -9,8 +9,8 @@ import "../TokenEdits.sol";
 
 contract TokentrollerV1 is ITokentroller {
     address public immutable tokenRegistry;
-    address public immutable tokenEdits;
     address public immutable tokenMetadata;
+    address public tokenEdits;
     address public owner;
 
     mapping(address => bool) public trustedHelpers;
@@ -25,6 +25,19 @@ contract TokentrollerV1 is ITokentroller {
         tokenMetadata = address(new TokenMetadata(address(this)));
         tokenRegistry = address(new TokenRegistry(address(this), tokenMetadata));
         tokenEdits = address(new TokenEdits(address(this), tokenMetadata));
+    }
+
+    /**********************************************************************************************
+     * @dev Updates the token edits contract address
+     * @param newTokenEdits The address of the new token edits contract
+     * @notice This function can only be called by the owner
+     * @notice The new token edits address must not be zero or the current address
+     *********************************************************************************************/
+    function updateTokenEdits(address newTokenEdits) external virtual {
+        require(msg.sender == owner, "Only the owner can call this function");
+        require(newTokenEdits != address(0), "New token edits address cannot be zero");
+        require(newTokenEdits != tokenEdits, "New token edits address cannot be the same as the current address");
+        tokenEdits = newTokenEdits;
     }
 
     /**********************************************************************************************
