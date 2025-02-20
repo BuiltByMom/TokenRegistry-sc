@@ -124,6 +124,7 @@ contract TokenEdits is ITokenEdits, ReentrancyGuard {
             delete edits[contractAddress][id];
             bool removed = EnumerableSet.remove(tokenActiveEdits[contractAddress], id);
             require(removed, "Failed to remove edit");
+            emit EditRejected(contractAddress, id, "Edit cleared due to another edit being accepted");
         }
 
         bool exists = tokensWithEdits.contains(contractAddress);
