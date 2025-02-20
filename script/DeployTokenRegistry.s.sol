@@ -22,7 +22,7 @@ contract DeployTokenRegistry is Script, CreateXScript {
             abi.encodePacked(
                 deployer, // First 20 bytes - deployer address
                 hex"00", // 21st byte - enable cross-chain protection
-                bytes11(uint88(109111109)) // Last 11 bytes - easter egg seed
+                bytes11(uint88(109111120)) // Last 11 bytes - easter egg seed
             )
         );
 
@@ -30,7 +30,7 @@ contract DeployTokenRegistry is Script, CreateXScript {
             abi.encodePacked(
                 deployer, // First 20 bytes - deployer address
                 hex"00", // 21st byte - enable cross-chain protection
-                bytes11(uint88(104101108112)) // Last 11 bytes
+                bytes11(uint88(104101108113)) // Last 11 bytes
             )
         );
 

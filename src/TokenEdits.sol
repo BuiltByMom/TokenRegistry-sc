@@ -93,7 +93,7 @@ contract TokenEdits is ITokenEdits, ReentrancyGuard {
             require(success, "Failed to add token to tracking");
         }
 
-        emit EditProposed(contractAddress, msg.sender, metadata);
+        emit EditProposed(contractAddress, editId, msg.sender, metadata);
 
         return editId;
     }
