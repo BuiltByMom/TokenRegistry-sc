@@ -17,7 +17,6 @@ interface ITokenRegistry {
     event TokenAdded(address indexed contractAddress, address indexed submitter);
     event TokenApproved(address indexed contractAddress);
     event TokenRejected(address indexed contractAddress, string reason);
-    event TokenUpdated(address indexed contractAddress);
     event TokentrollerUpdated(address indexed newTokentroller);
 
     function addToken(address contractAddress, MetadataInput[] calldata metadata) external;

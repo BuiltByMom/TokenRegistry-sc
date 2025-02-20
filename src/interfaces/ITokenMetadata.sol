@@ -21,10 +21,6 @@ interface ITokenMetadata {
 
     event TokentrollerUpdated(address indexed newTokentroller);
 
-    event MetadataEditProposed(address indexed token, address submitter, MetadataInput[] updates);
-    event MetadataEditAccepted(address indexed token, uint256 indexed editIndex);
-    event MetadataEditRejected(address indexed token, uint256 indexed editIndex, string reason);
-
     function addField(string calldata name, bool isRequired) external;
     function addField(string calldata name) external;
     function updateField(string calldata name, bool isActive, bool isRequired) external;

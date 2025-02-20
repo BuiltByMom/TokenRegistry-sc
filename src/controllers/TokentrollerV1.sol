@@ -266,27 +266,6 @@ contract TokentrollerV1 is ITokentroller {
     }
 
     /**********************************************************************************************
-     * @dev Checks if a metadata field can be set
-     * @param sender The address of the sender
-     * @param contractAddress The address of the token
-     * @param field The name of the metadata field
-     * @notice This function is called by the TokenRegistry contract
-     * @notice It should implement any necessary checks before allowing metadata field updates
-     * @return bool Returns true if the metadata field can be updated, false otherwise
-     *********************************************************************************************/
-    function canSetMetadata(
-        address sender,
-        address contractAddress,
-        string calldata field
-    ) external view virtual returns (bool) {
-        TokenRegistry registry = TokenRegistry(tokenRegistry);
-        TokenStatus status = registry.tokenStatus(contractAddress);
-
-        // Only allow setting metadata for pending or new tokens
-        return status == TokenStatus.PENDING || status == TokenStatus.NONE;
-    }
-
-    /**********************************************************************************************
      * @dev Checks if a metadata can be updated
      * @param sender The address of the sender
      * @param contractAddress The address of the new token to be added

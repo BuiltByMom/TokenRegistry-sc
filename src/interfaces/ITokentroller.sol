@@ -23,12 +23,6 @@ interface ITokentroller {
         bool isActive,
         bool isRequired
     ) external view returns (bool);
-    function canSetMetadata(
-        address sender,
-        address contractAddress,
-        string calldata field
-    ) external view returns (bool);
-
     function canUpdateMetadata(address sender, address contractAddress) external view returns (bool);
 
     function updateOwner(address newOwner) external;
