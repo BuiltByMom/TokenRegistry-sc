@@ -9,9 +9,7 @@ import "./interfaces/ITokentroller.sol";
 
 /**
  * @title Helper
- * @dev A helper contract that provides convenient functions for managing tokens and their edits
- * in the TokenRegistry system. This contract combines multiple operations into single transactions
- * for better efficiency and ease of use.
+ * @dev Helper contract for batch operations on TokenRegistry and TokenEdits
  */
 contract Helper {
     ITokenRegistry public immutable tokenRegistry;
@@ -19,12 +17,9 @@ contract Helper {
     ITokenMetadata public immutable tokenMetadata;
     ITokentroller public immutable tokentroller;
 
-    // Result struct to track success/failure of each operation
-    struct BatchResult {
-        address token;
-        bool success;
-        string errorMessage;
-        uint256 editId; // Only used for edit operations
+    struct BatchTokenInput {
+        address contractAddress;
+        MetadataInput[] metadata;
     }
 
     struct BatchEdits {
@@ -32,16 +27,12 @@ contract Helper {
         uint256 editId;
     }
 
-    struct BatchTokenInput {
-        address contractAddress;
-        MetadataInput[] metadata;
-    }
-
     /**
      * @dev Constructor to initialize the helper with required contract addresses
      * @param _tokenRegistry Address of the TokenRegistry contract
      * @param _tokenEdits Address of the TokenEdits contract
      * @param _tokenMetadata Address of the TokenMetadata contract
+     * @param _tokentroller Address of the Tokentroller contract
      */
     constructor(address _tokenRegistry, address _tokenEdits, address _tokenMetadata, address _tokentroller) {
         require(_tokenRegistry != address(0), "Invalid token registry address");
@@ -81,311 +72,100 @@ contract Helper {
     }
 
     /**
-     * @dev Executes multiple token approvals using multicall pattern
+     * @dev Executes multiple token approvals
      * @param tokens Array of token addresses to approve
-     * @return results Array of results for each operation
-     * @return summary Tuple of (total, succeeded, failed)
      */
-    function batchApproveTokens(
-        address[] calldata tokens
-    ) public returns (BatchResult[] memory results, uint256[3] memory summary) {
-        results = new BatchResult[](tokens.length);
-        summary[0] = tokens.length; // total
-
+    function batchApproveTokens(address[] calldata tokens) public {
         for (uint256 i = 0; i < tokens.length; i++) {
-            results[i].token = tokens[i];
-
-            if (tokens[i] == address(0)) {
-                results[i].success = false;
-                results[i].errorMessage = "Invalid token address";
-                summary[2]++; // failed
-                continue;
-            }
-
-            if (!tokentroller.canApproveToken(msg.sender, tokens[i])) {
-                results[i].success = false;
-                results[i].errorMessage = "Not authorized to approve token";
-                summary[2]++; // failed
-                continue;
-            }
-
-            try tokenRegistry.approveToken(tokens[i]) {
-                results[i].success = true;
-                summary[1]++; // succeeded
-            } catch Error(string memory reason) {
-                results[i].success = false;
-                results[i].errorMessage = reason;
-                summary[2]++; // failed
-            } catch (bytes memory) {
-                results[i].success = false;
-                results[i].errorMessage = "Unknown error";
-                summary[2]++; // failed
-            }
+            require(tokentroller.canApproveToken(msg.sender, tokens[i]), "Not authorized to approve token");
+            tokenRegistry.approveToken(tokens[i]);
         }
     }
 
     /**
-     * @dev Executes multiple token rejections using multicall pattern
+     * @dev Executes multiple token rejections
      * @param tokens Array of token addresses to reject
      * @param reason Reason for rejection
-     * @return results Array of results for each operation
-     * @return summary Tuple of (total, succeeded, failed)
      */
-    function batchRejectTokens(
-        address[] calldata tokens,
-        string calldata reason
-    ) public returns (BatchResult[] memory results, uint256[3] memory summary) {
+    function batchRejectTokens(address[] calldata tokens, string calldata reason) public {
         require(bytes(reason).length > 0, "Empty reason");
-        results = new BatchResult[](tokens.length);
-        summary[0] = tokens.length; // total
 
         for (uint256 i = 0; i < tokens.length; i++) {
-            results[i].token = tokens[i];
-
-            if (tokens[i] == address(0)) {
-                results[i].success = false;
-                results[i].errorMessage = "Invalid token address";
-                summary[2]++; // failed
-                continue;
-            }
-
-            if (!tokentroller.canRejectToken(msg.sender, tokens[i])) {
-                results[i].success = false;
-                results[i].errorMessage = "Not authorized to reject token";
-                summary[2]++; // failed
-                continue;
-            }
-
-            try tokenRegistry.rejectToken(tokens[i], reason) {
-                results[i].success = true;
-                summary[1]++; // succeeded
-            } catch Error(string memory revertReason) {
-                results[i].success = false;
-                results[i].errorMessage = revertReason;
-                summary[2]++; // failed
-            } catch (bytes memory) {
-                results[i].success = false;
-                results[i].errorMessage = "Unknown error";
-                summary[2]++; // failed
-            }
+            require(tokentroller.canRejectToken(msg.sender, tokens[i]), "Not authorized to reject token");
+            tokenRegistry.rejectToken(tokens[i], reason);
         }
     }
 
     /**
-     * @dev Executes multiple token additions and approvals using multicall pattern
+     * @dev Executes multiple token additions and approvals
      * @param tokens Array of BatchTokenInput structs
-     * @return results Array of results for each operation
-     * @return summary Tuple of (total, succeeded, failed)
      */
-    function batchAddAndApproveTokens(
-        BatchTokenInput[] calldata tokens
-    ) external returns (BatchResult[] memory results, uint256[3] memory summary) {
-        results = new BatchResult[](tokens.length);
-        summary[0] = tokens.length; // total
-
+    function batchAddAndApproveTokens(BatchTokenInput[] calldata tokens) external {
         for (uint256 i = 0; i < tokens.length; i++) {
-            results[i].token = tokens[i].contractAddress;
+            require(tokentroller.canAddToken(msg.sender, tokens[i].contractAddress), "Not authorized to add token");
+            tokenRegistry.addToken(tokens[i].contractAddress, tokens[i].metadata);
 
-            if (tokens[i].contractAddress == address(0)) {
-                results[i].success = false;
-                results[i].errorMessage = "Invalid token address";
-                summary[2]++; // failed
-                continue;
-            }
-
-            if (!tokentroller.canAddToken(msg.sender, tokens[i].contractAddress)) {
-                results[i].success = false;
-                results[i].errorMessage = "Not authorized to add token";
-                summary[2]++; // failed
-                continue;
-            }
-
-            if (!tokentroller.canApproveToken(msg.sender, tokens[i].contractAddress)) {
-                results[i].success = false;
-                results[i].errorMessage = "Not authorized to approve token";
-                summary[2]++; // failed
-                continue;
-            }
-
-            try tokenRegistry.addToken(tokens[i].contractAddress, tokens[i].metadata) {
-                try tokenRegistry.approveToken(tokens[i].contractAddress) {
-                    results[i].success = true;
-                    summary[1]++; // succeeded
-                } catch Error(string memory reason) {
-                    results[i].success = false;
-                    results[i].errorMessage = reason;
-                    summary[2]++; // failed
-                } catch (bytes memory) {
-                    results[i].success = false;
-                    results[i].errorMessage = "Unknown error during approval";
-                    summary[2]++; // failed
-                }
-            } catch Error(string memory reason) {
-                results[i].success = false;
-                results[i].errorMessage = reason;
-                summary[2]++; // failed
-            } catch (bytes memory) {
-                results[i].success = false;
-                results[i].errorMessage = "Unknown error during addition";
-                summary[2]++; // failed
-            }
+            require(
+                tokentroller.canApproveToken(msg.sender, tokens[i].contractAddress),
+                "Not authorized to approve token"
+            );
+            tokenRegistry.approveToken(tokens[i].contractAddress);
         }
     }
 
     /**
-     * @dev Executes multiple edit acceptances using multicall pattern
-     * @param edits Array of BatchEdits structs
-     * @return results Array of results for each operation
-     * @return summary Tuple of (total, succeeded, failed)
-     */
-    function batchAcceptEdits(
-        BatchEdits[] calldata edits
-    ) public returns (BatchResult[] memory results, uint256[3] memory summary) {
-        results = new BatchResult[](edits.length);
-        summary[0] = edits.length; // total
-
-        for (uint256 i = 0; i < edits.length; i++) {
-            results[i].token = edits[i].contractAddress;
-            results[i].editId = edits[i].editId;
-
-            if (edits[i].contractAddress == address(0)) {
-                results[i].success = false;
-                results[i].errorMessage = "Invalid token address";
-                summary[2]++; // failed
-                continue;
-            }
-            if (edits[i].editId == 0) {
-                results[i].success = false;
-                results[i].errorMessage = "Invalid edit ID";
-                summary[2]++; // failed
-                continue;
-            }
-
-            if (!tokentroller.canAcceptTokenEdit(msg.sender, edits[i].contractAddress, edits[i].editId)) {
-                results[i].success = false;
-                results[i].errorMessage = "Not authorized to accept edit";
-                summary[2]++; // failed
-                continue;
-            }
-
-            try tokenEdits.acceptEdit(edits[i].contractAddress, edits[i].editId) {
-                results[i].success = true;
-                summary[1]++; // succeeded
-            } catch Error(string memory reason) {
-                results[i].success = false;
-                results[i].errorMessage = reason;
-                summary[2]++; // failed
-            } catch (bytes memory) {
-                results[i].success = false;
-                results[i].errorMessage = "Unknown error";
-                summary[2]++; // failed
-            }
-        }
-    }
-
-    /**
-     * @dev Executes multiple edit rejections using multicall pattern
+     * @dev Executes multiple edit rejections
      * @param edits Array of BatchEdits structs
      * @param reason Reason for rejection
-     * @return results Array of results for each operation
-     * @return summary Tuple of (total, succeeded, failed)
      */
-    function batchRejectEdits(
-        BatchEdits[] calldata edits,
-        string calldata reason
-    ) public returns (BatchResult[] memory results, uint256[3] memory summary) {
+    function batchRejectEdits(BatchEdits[] calldata edits, string calldata reason) public {
         require(bytes(reason).length > 0, "Empty reason");
-        results = new BatchResult[](edits.length);
-        summary[0] = edits.length; // total
 
         for (uint256 i = 0; i < edits.length; i++) {
-            results[i].token = edits[i].contractAddress;
-            results[i].editId = edits[i].editId;
-
-            if (edits[i].contractAddress == address(0)) {
-                results[i].success = false;
-                results[i].errorMessage = "Invalid token address";
-                summary[2]++; // failed
-                continue;
-            }
-            if (edits[i].editId == 0) {
-                results[i].success = false;
-                results[i].errorMessage = "Invalid edit ID";
-                summary[2]++; // failed
-                continue;
-            }
-
-            if (!tokentroller.canRejectTokenEdit(msg.sender, edits[i].contractAddress, edits[i].editId)) {
-                results[i].success = false;
-                results[i].errorMessage = "Not authorized to reject edit";
-                summary[2]++; // failed
-                continue;
-            }
-
-            try tokenEdits.rejectEdit(edits[i].contractAddress, edits[i].editId, reason) {
-                results[i].success = true;
-                summary[1]++; // succeeded
-            } catch Error(string memory revertReason) {
-                results[i].success = false;
-                results[i].errorMessage = revertReason;
-                summary[2]++; // failed
-            } catch (bytes memory) {
-                results[i].success = false;
-                results[i].errorMessage = "Unknown error";
-                summary[2]++; // failed
-            }
+            require(
+                tokentroller.canRejectTokenEdit(msg.sender, edits[i].contractAddress, edits[i].editId),
+                "Not authorized to reject edit"
+            );
+            tokenEdits.rejectEdit(edits[i].contractAddress, edits[i].editId, reason);
         }
     }
 
     /**
-     * @dev Executes multiple token approvals and edit acceptances using multicall pattern
-     * @param tokens Array of token addresses
+     * @dev Executes multiple edit acceptances
      * @param edits Array of BatchEdits structs
-     * @return tokenResults Results of token operations
-     * @return editResults Results of edit operations
-     * @return tokenSummary Summary of token operations (total, succeeded, failed)
-     * @return editSummary Summary of edit operations (total, succeeded, failed)
      */
-    function batchApproveAndAcceptEdits(
-        address[] calldata tokens,
-        BatchEdits[] calldata edits
-    )
-        external
-        returns (
-            BatchResult[] memory tokenResults,
-            BatchResult[] memory editResults,
-            uint256[3] memory tokenSummary,
-            uint256[3] memory editSummary
-        )
-    {
-        (tokenResults, tokenSummary) = batchApproveTokens(tokens);
-        (editResults, editSummary) = batchAcceptEdits(edits);
+    function batchAcceptEdits(BatchEdits[] calldata edits) public {
+        for (uint256 i = 0; i < edits.length; i++) {
+            require(
+                tokentroller.canAcceptTokenEdit(msg.sender, edits[i].contractAddress, edits[i].editId),
+                "Not authorized to accept edit"
+            );
+            tokenEdits.acceptEdit(edits[i].contractAddress, edits[i].editId);
+        }
     }
 
     /**
-     * @dev Executes multiple token rejections and edit rejections using multicall pattern
+     * @dev Executes multiple token approvals and edit acceptances
+     * @param tokens Array of token addresses
+     * @param edits Array of BatchEdits structs
+     */
+    function batchApproveAndAcceptEdits(address[] calldata tokens, BatchEdits[] calldata edits) external {
+        batchApproveTokens(tokens);
+        batchAcceptEdits(edits);
+    }
+
+    /**
+     * @dev Executes multiple token rejections and edit rejections
      * @param tokens Array of token addresses
      * @param edits Array of BatchEdits structs
      * @param reason Reason for rejection
-     * @return tokenResults Results of token operations
-     * @return editResults Results of edit operations
-     * @return tokenSummary Summary of token operations (total, succeeded, failed)
-     * @return editSummary Summary of edit operations (total, succeeded, failed)
      */
     function batchRejectAndRejectEdits(
         address[] calldata tokens,
         BatchEdits[] calldata edits,
         string calldata reason
-    )
-        external
-        returns (
-            BatchResult[] memory tokenResults,
-            BatchResult[] memory editResults,
-            uint256[3] memory tokenSummary,
-            uint256[3] memory editSummary
-        )
-    {
-        (tokenResults, tokenSummary) = batchRejectTokens(tokens, reason);
-        (editResults, editSummary) = batchRejectEdits(edits, reason);
+    ) external {
+        batchRejectTokens(tokens, reason);
+        batchRejectEdits(edits, reason);
     }
 }

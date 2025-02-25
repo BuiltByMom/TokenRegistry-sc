@@ -79,7 +79,6 @@ contract TokenEdits is ITokenEdits, ReentrancyGuard {
         MetadataInput[] storage editArray = edits[contractAddress][editId];
         for (uint256 i = 0; i < metadata.length; i++) {
             require(bytes(metadata[i].field).length > 0, "Empty field name");
-            require(bytes(metadata[i].value).length > 0, "Empty value");
             editArray.push(metadata[i]);
         }
 
@@ -124,7 +123,10 @@ contract TokenEdits is ITokenEdits, ReentrancyGuard {
             delete edits[contractAddress][id];
             bool removed = EnumerableSet.remove(tokenActiveEdits[contractAddress], id);
             require(removed, "Failed to remove edit");
-            emit EditRejected(contractAddress, id, "Edit cleared due to another edit being accepted");
+
+            if (id != editId) {
+                emit EditRejected(contractAddress, id, "Edit cleared due to another edit being accepted");
+            }
         }
 
         bool exists = tokensWithEdits.contains(contractAddress);
