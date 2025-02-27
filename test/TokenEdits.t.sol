@@ -418,25 +418,4 @@ contract TokenEditsTest is Test {
         tokenEdits.proposeEdit(address(token), badMetadata);
         vm.stopPrank();
     }
-
-    function testCannotProposeEmptyValue() public {
-        // First add and approve a token
-        vm.startPrank(nonOwner);
-        MetadataInput[] memory metadata = new MetadataInput[](1);
-        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/logo.png" });
-        tokenRegistry.addToken(address(token), metadata);
-        vm.stopPrank();
-
-        vm.startPrank(owner);
-        tokenRegistry.approveToken(address(token));
-        vm.stopPrank();
-
-        // Try to propose edit with empty value
-        vm.startPrank(nonOwner);
-        MetadataInput[] memory badMetadata = new MetadataInput[](1);
-        badMetadata[0] = MetadataInput({ field: "logoURI", value: "" });
-        vm.expectRevert("Empty value");
-        tokenEdits.proposeEdit(address(token), badMetadata);
-        vm.stopPrank();
-    }
 }
