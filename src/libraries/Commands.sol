@@ -9,18 +9,20 @@ library Commands {
     uint256 public constant ADD_METADATA_FIELD = 0x04;
     uint256 public constant UPDATE_METADATA_FIELD = 0x05;
     uint256 public constant UPDATE_REGISTRY_TOKENTROLLER = 0x06;
-    uint256 public constant UPDATE_METADATA_TOKENTROLLER = 0x07;
+    uint256 public constant UPDATE_TOKEN_EDITS = 0x07;
+    uint256 public constant UPDATE_OWNER = 0x08;
 
     // Default gas limits for each command + 20% buffer
     function defaultGasLimit(uint256 _command) public pure returns (uint256) {
         if (_command == Commands.APPROVE_TOKEN) return 202_082;
         if (_command == Commands.REJECT_TOKEN) return 209_404;
-        if (_command == Commands.ACCEPT_TOKEN_EDIT) return 184_617;
+        if (_command == Commands.ACCEPT_TOKEN_EDIT) return 212_608;
         if (_command == Commands.REJECT_TOKEN_EDIT) return 97_251;
-        if (_command == Commands.ADD_METADATA_FIELD) return 192_156;
-        if (_command == Commands.UPDATE_METADATA_FIELD) return 93_544;
-        if (_command == Commands.UPDATE_REGISTRY_TOKENTROLLER) return 103_344;
-        if (_command == Commands.UPDATE_METADATA_TOKENTROLLER) return 104_810;
+        if (_command == Commands.ADD_METADATA_FIELD) return 190_000;
+        if (_command == Commands.UPDATE_METADATA_FIELD) return 113_000;
+        if (_command == Commands.UPDATE_REGISTRY_TOKENTROLLER) return 130_000;
+        if (_command == Commands.UPDATE_TOKEN_EDITS) return 93_000;
+        if (_command == Commands.UPDATE_OWNER) return 93_000;
         return 0;
     }
 

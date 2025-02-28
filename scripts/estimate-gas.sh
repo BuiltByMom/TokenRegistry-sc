@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Load environment variables
-source .env.test
+source .env.local
 
 export HYPERLANE_LEAF_PLUGIN
 export HYPERLANE_LEAF_RPC
@@ -49,33 +49,44 @@ forge script script/GasEstimator.s.sol:GasEstimator \
 
 echo "Estimating gas for executeAddMetadataField..."
 forge script script/GasEstimator.s.sol:GasEstimator \
-    --sig "estimateExecuteAddMetadataField(address,string)" \
+    --sig "estimateExecuteAddMetadataField(address,string,bool)" \
     $HYPERLANE_LEAF_PLUGIN \
     "testField" \
+    true \
     --rpc-url $HYPERLANE_LEAF_RPC
 
 echo "Estimating gas for executeUpdateMetadataField..."
 forge script script/GasEstimator.s.sol:GasEstimator \
     --sig "estimateExecuteUpdateMetadataField(address,string,bool,bool)" \
     $HYPERLANE_LEAF_PLUGIN \
-    "testField" \
-    true \
+    "logoURI" \
     false \
+    true \
     --rpc-url $HYPERLANE_LEAF_RPC
 
 echo "Estimating gas for executeUpdateRegistryTokentroller..."
 forge script script/GasEstimator.s.sol:GasEstimator \
     --sig "estimateExecuteUpdateRegistryTokentroller(address,address)" \
     $HYPERLANE_LEAF_PLUGIN \
-    $HYPERLANE_ROOT_PLUGIN \
+    "0x7D792EAfdD06aB176706ead14de32A988e20873c" \
     --rpc-url $HYPERLANE_LEAF_RPC
 
-echo "Estimating gas for executeUpdateMetadataTokentroller..."
+echo "Estimating gas for updateOwner..."
 forge script script/GasEstimator.s.sol:GasEstimator \
-    --sig "estimateExecuteUpdateMetadataTokentroller(address,address)" \
+    --sig "estimateUpdateOwner(address,address)" \
     $HYPERLANE_LEAF_PLUGIN \
-    $HYPERLANE_ROOT_PLUGIN \
+    "0x7D792EAfdD06aB176706ead14de32A988e20873c" \
     --rpc-url $HYPERLANE_LEAF_RPC
+
+
+
+echo "Estimating gas for updateTokenEdits..."
+forge script script/GasEstimator.s.sol:GasEstimator \
+    --sig "estimateUpdateTokenEdits(address,address)" \
+    $HYPERLANE_LEAF_PLUGIN \
+    "0x7D792EAfdD06aB176706ead14de32A988e20873c" \
+    --rpc-url $HYPERLANE_LEAF_RPC
+
 
 # Add buffer for safety (e.g., 20%)
 # You can use this value as gasLimit in StandardHookMetadata

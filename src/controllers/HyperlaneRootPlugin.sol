@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./TokentrollerV1.sol";
+import "./TokentrollerV1Update.sol";
 import "@hyperlane/interfaces/IMailbox.sol";
 import "@hyperlane/hooks/libs/StandardHookMetadata.sol";
 import "../libraries/Commands.sol";
@@ -12,7 +12,7 @@ import "../libraries/Commands.sol";
  * through Hyperlane's messaging protocol. This contract acts as the root node in the
  * cross-chain system, sending commands to leaf chains.
  *********************************************************************************************/
-contract HyperlaneRootPlugin is TokentrollerV1 {
+contract HyperlaneRootPlugin is TokentrollerV1Update {
     using Commands for uint256;
 
     // Hyperlane mailbox contract for cross-chain messaging
@@ -36,11 +36,17 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
     event CrossChainTokenApproved(uint256 indexed chainId, address indexed token);
     event CrossChainTokenRejected(uint256 indexed chainId, address indexed token, string reason);
     event CrossChainTokenEditAccepted(uint256 indexed chainId, address indexed token, uint256 indexed editId);
-    event CrossChainTokenEditRejected(uint256 indexed chainId, address indexed token, uint256 indexed editId);
-    event CrossChainMetadataFieldAdded(uint256 indexed chainId, string indexed name);
+    event CrossChainTokenEditRejected(
+        uint256 indexed chainId,
+        address indexed token,
+        uint256 indexed editId,
+        string reason
+    );
+    event CrossChainMetadataFieldAdded(uint256 indexed chainId, string indexed name, bool isRequired);
     event CrossChainMetadataFieldUpdated(uint256 indexed chainId, string indexed name, bool isActive, bool isRequired);
     event CrossChainRegistryTokentrollerUpdated(uint256 indexed chainId, address indexed newTokentroller);
-    event CrossChainMetadataTokentrollerUpdated(uint256 indexed chainId, address indexed newTokentroller);
+    event CrossChainTokenEditsUpdated(uint256 indexed chainId, address indexed newTokenEdits);
+    event CrossChainOwnerUpdated(uint256 indexed chainId, address indexed newOwner);
 
     /**********************************************************************************************
      * @dev Constructor for the HyperlaneRootPlugin contract
@@ -48,7 +54,13 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
      * @param _mailbox The address of the Hyperlane mailbox contract
      * @notice Initializes the contract with the owner and mailbox addresses
      *********************************************************************************************/
-    constructor(address _owner, address _mailbox) TokentrollerV1(_owner) {
+    constructor(
+        address _owner,
+        address _mailbox,
+        address _tokenMetadata,
+        address _tokenRegistry,
+        address _tokenEdits
+    ) TokentrollerV1Update(_owner, _tokenMetadata, _tokenRegistry, _tokenEdits) {
         mailbox = IMailbox(_mailbox);
     }
 
@@ -186,38 +198,65 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
     }
 
     /**********************************************************************************************
-     * @dev Updates the metadata tokentroller on a leaf chain
+     * @dev Updates the token edits on a leaf chain
      * @param chainId The ID of the chain to update
-     * @param newTokentroller The address of the new tokentroller
+     * @param newTokenEdits The address of the new token edits
      * @param customGasLimit Optional custom gas limit for the operation
      * @notice This function can only be called by the owner
-     * @notice The new tokentroller address cannot be zero
-     * @notice Emits a CrossChainMetadataTokentrollerUpdated event on success
+     * @notice The new token edits address cannot be zero
+     * @notice Emits a CrossChainTokenEditsUpdated event on success
      *********************************************************************************************/
-    function updateMetadataTokentroller(
-        uint256 chainId,
-        address newTokentroller,
-        uint256 customGasLimit
-    ) public payable {
-        require(msg.sender == owner, "Only owner can update metadata tokentroller");
-        require(newTokentroller != address(0), "New tokentroller address cannot be zero");
+    function updateTokenEdits(uint256 chainId, address newTokenEdits, uint256 customGasLimit) public payable {
+        require(msg.sender == owner, "Only owner can update token edits");
+        require(newTokenEdits != address(0), "New token edits address cannot be zero");
 
-        bytes memory message = abi.encodeWithSignature("updateMetadataTokentroller(address)", newTokentroller);
+        bytes memory message = abi.encodeWithSignature("updateTokenEdits(address)", newTokenEdits);
 
-        sendMessage(chainId, leafs[chainId], message, Commands.UPDATE_METADATA_TOKENTROLLER, customGasLimit);
+        sendMessage(chainId, leafs[chainId], message, Commands.UPDATE_TOKEN_EDITS, customGasLimit);
 
-        emit CrossChainMetadataTokentrollerUpdated(chainId, newTokentroller);
+        emit CrossChainTokenEditsUpdated(chainId, newTokenEdits);
     }
 
     /**********************************************************************************************
-     * @dev Updates the metadata tokentroller on a leaf chain with default gas limit
+     * @dev Updates the token edits on a leaf chain with default gas limit
      * @param chainId The ID of the chain to update
-     * @param newTokentroller The address of the new tokentroller
+     * @param newTokenEdits The address of the new token edits
      * @notice This function can only be called by the owner
      * @notice Uses the default gas limit for the operation
      *********************************************************************************************/
-    function updateMetadataTokentroller(uint256 chainId, address newTokentroller) external payable {
-        updateMetadataTokentroller(chainId, newTokentroller, 0);
+    function updateTokenEdits(uint256 chainId, address newTokenEdits) external payable {
+        updateTokenEdits(chainId, newTokenEdits, 0);
+    }
+
+    /**********************************************************************************************
+     * @dev Updates the owner on a leaf chain
+     * @param chainId The ID of the chain to update
+     * @param newOwner The address of the new owner
+     * @param customGasLimit Optional custom gas limit for the operation
+     * @notice This function can only be called by the owner
+     * @notice The new owner address cannot be zero
+     * @notice Emits a CrossChainOwnerUpdated event on success
+     *********************************************************************************************/
+    function updateOwner(uint256 chainId, address newOwner, uint256 customGasLimit) public payable {
+        require(msg.sender == owner, "Only owner can update owner");
+        require(newOwner != address(0), "New owner address cannot be zero");
+
+        bytes memory message = abi.encodeWithSignature("updateOwner(address)", newOwner);
+
+        sendMessage(chainId, leafs[chainId], message, Commands.UPDATE_OWNER, customGasLimit);
+
+        emit CrossChainOwnerUpdated(chainId, newOwner);
+    }
+
+    /**********************************************************************************************
+     * @dev Updates the owner on a leaf chain with default gas limit
+     * @param chainId The ID of the chain to update
+     * @param newOwner The address of the new owner
+     * @notice This function can only be called by the owner
+     * @notice Uses the default gas limit for the operation
+     *********************************************************************************************/
+    function updateOwner(uint256 chainId, address newOwner) external payable {
+        updateOwner(chainId, newOwner, 0);
     }
 
     /**********************************************************************************************
@@ -332,6 +371,7 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
      * @param chainId The ID of the chain to reject the edit on
      * @param token The address of the token whose edit is being rejected
      * @param editId The ID of the edit to reject
+     * @param reason The reason for rejecting the edit
      * @param customGasLimit Optional custom gas limit for the operation
      * @notice This function can only be called by the owner
      * @notice The leaf must be set for the chain
@@ -341,16 +381,22 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
         uint256 chainId,
         address token,
         uint256 editId,
+        string calldata reason,
         uint256 customGasLimit
     ) public payable {
         require(msg.sender == owner, "Only owner can reject token edits");
         require(leafs[chainId] != address(0), "Leaf not set");
 
-        bytes memory message = abi.encodeWithSignature("executeRejectTokenEdit(address,uint256)", token, editId);
+        bytes memory message = abi.encodeWithSignature(
+            "executeRejectTokenEdit(address,uint256,string)",
+            token,
+            editId,
+            reason
+        );
 
         sendMessage(chainId, leafs[chainId], message, Commands.REJECT_TOKEN_EDIT, customGasLimit);
 
-        emit CrossChainTokenEditRejected(chainId, token, editId);
+        emit CrossChainTokenEditRejected(chainId, token, editId, reason);
     }
 
     /**********************************************************************************************
@@ -358,42 +404,55 @@ contract HyperlaneRootPlugin is TokentrollerV1 {
      * @param chainId The ID of the chain to reject the edit on
      * @param token The address of the token whose edit is being rejected
      * @param editId The ID of the edit to reject
+     * @param reason The reason for rejecting the edit
      * @notice This function can only be called by the owner
      * @notice Uses the default gas limit for the operation
      *********************************************************************************************/
-    function rejectTokenEditOnLeaf(uint256 chainId, address token, uint256 editId) external payable {
-        rejectTokenEditOnLeaf(chainId, token, editId, 0);
+    function rejectTokenEditOnLeaf(
+        uint256 chainId,
+        address token,
+        uint256 editId,
+        string calldata reason
+    ) external payable {
+        rejectTokenEditOnLeaf(chainId, token, editId, reason, 0);
     }
 
     /**********************************************************************************************
      * @dev Adds a metadata field on a leaf chain
      * @param chainId The ID of the chain to add the field on
      * @param name The name of the metadata field to add
+     * @param isRequired Whether the field should be required
      * @param customGasLimit Optional custom gas limit for the operation
      * @notice This function can only be called by the owner
      * @notice The leaf must be set for the chain
      * @notice Emits a CrossChainMetadataFieldAdded event on success
      *********************************************************************************************/
-    function addMetadataFieldOnLeaf(uint256 chainId, string calldata name, uint256 customGasLimit) public payable {
+    function addMetadataFieldOnLeaf(
+        uint256 chainId,
+        string calldata name,
+        bool isRequired,
+        uint256 customGasLimit
+    ) public payable {
         require(msg.sender == owner, "Only owner can add metadata fields");
         require(leafs[chainId] != address(0), "Leaf not set");
 
-        bytes memory message = abi.encodeWithSignature("executeAddMetadataField(string)", name);
+        bytes memory message = abi.encodeWithSignature("executeAddMetadataField(string,bool)", name, isRequired);
 
         sendMessage(chainId, leafs[chainId], message, Commands.ADD_METADATA_FIELD, customGasLimit);
 
-        emit CrossChainMetadataFieldAdded(chainId, name);
+        emit CrossChainMetadataFieldAdded(chainId, name, isRequired);
     }
 
     /**********************************************************************************************
      * @dev Adds a metadata field on a leaf chain with default gas limit
      * @param chainId The ID of the chain to add the field on
      * @param name The name of the metadata field to add
+     * @param isRequired Whether the field should be required
      * @notice This function can only be called by the owner
      * @notice Uses the default gas limit for the operation
      *********************************************************************************************/
-    function addMetadataFieldOnLeaf(uint256 chainId, string calldata name) external payable {
-        addMetadataFieldOnLeaf(chainId, name, 0);
+    function addMetadataFieldOnLeaf(uint256 chainId, string calldata name, bool isRequired) external payable {
+        addMetadataFieldOnLeaf(chainId, name, isRequired, 0);
     }
 
     /**********************************************************************************************

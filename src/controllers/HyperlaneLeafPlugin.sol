@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./TokentrollerV1.sol";
+import "./TokentrollerV1Update.sol";
 import "@hyperlane/interfaces/IMailbox.sol";
 
 /**********************************************************************************************
@@ -10,7 +10,7 @@ import "@hyperlane/interfaces/IMailbox.sol";
  * through Hyperlane's messaging protocol. This contract acts as a leaf node in the
  * cross-chain system, receiving and executing commands from the root chain.
  *********************************************************************************************/
-contract HyperlaneLeafPlugin is TokentrollerV1 {
+contract HyperlaneLeafPlugin is TokentrollerV1Update {
     address public immutable root;
 
     // Hyperlane mailbox contract for cross-chain messaging
@@ -50,7 +50,14 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
      * @param _root The address of the root contract on the root chain
      * @param _mailbox The address of the Hyperlane mailbox contract
      *********************************************************************************************/
-    constructor(address _owner, address _root, address _mailbox) TokentrollerV1(_owner) {
+    constructor(
+        address _owner,
+        address _root,
+        address _mailbox,
+        address _tokenMetadata,
+        address _tokenRegistry,
+        address _tokenEdits
+    ) TokentrollerV1Update(_owner, _tokenMetadata, _tokenRegistry, _tokenEdits) {
         require(_root != address(0), "HyperlaneLeafPlugin: root cannot be zero address");
         require(_mailbox != address(0), "HyperlaneLeafPlugin: mailbox cannot be zero address");
         root = _root;
@@ -210,18 +217,13 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
             emit CrossChainMessageFailed(currentMessageId, reason);
             revert(reason);
         }
-    }
 
-    /**********************************************************************************************
-     * @dev Updates the tokentroller address in the TokenMetadata contract via cross-chain message
-     * @param newTokentroller The address of the new tokentroller
-     * @notice This function can only be called by the root chain
-     * @notice The new tokentroller address must not be zero or the current contract address
-     * @notice Emits CrossChainMessageExecuted on success or CrossChainMessageFailed on failure
-     *********************************************************************************************/
-    function updateMetadataTokentroller(address newTokentroller) external override onlyFromRoot crossChainContext {
-        require(newTokentroller != address(0), "New tokentroller address cannot be zero");
-        require(newTokentroller != address(this), "New tokentroller address cannot be the same as the current address");
+        try TokenEdits(tokenEdits).updateTokentroller(newTokentroller) {
+            emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        } catch Error(string memory reason) {
+            emit CrossChainMessageFailed(currentMessageId, reason);
+            revert(reason);
+        }
 
         try TokenMetadata(tokenMetadata).updateTokentroller(newTokentroller) {
             emit CrossChainMessageExecuted(currentMessageId, msg.data);
@@ -229,6 +231,40 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
             emit CrossChainMessageFailed(currentMessageId, reason);
             revert(reason);
         }
+    }
+
+    /**********************************************************************************************
+     * @dev Updates the owner of the Tokentroller contract via cross-chain message
+     * @param newOwner The address of the new owner
+     * @notice This function can only be called by the root chain
+     * @notice The new owner address must not be zero or the current contract address
+     * @notice Emits CrossChainMessageExecuted on success
+     *********************************************************************************************/
+    function updateTokenEdits(address newTokenEdits) external override onlyFromRoot crossChainContext {
+        require(newTokenEdits != address(0), "New token edits address cannot be zero");
+        require(newTokenEdits != address(this), "New token edits address cannot be the same as the current address");
+
+        tokenEdits = newTokenEdits;
+
+        emit CrossChainMessageExecuted(currentMessageId, msg.data);
+    }
+
+    /**********************************************************************************************
+     * @dev Updates the owner of the Tokentroller contract via cross-chain message
+     * @param newOwner The address of the new owner
+     * @notice This function can only be called by the root chain
+     * @notice The new owner address must not be zero or the current contract address
+     * @notice Emits CrossChainMessageExecuted and OwnerUpdated on success
+     *********************************************************************************************/
+    function updateOwner(address newOwner) external override onlyFromRoot crossChainContext {
+        require(newOwner != address(0), "New owner address cannot be zero");
+        require(newOwner != address(this), "New owner address cannot be the same as the current address");
+
+        address oldOwner = owner;
+        owner = newOwner;
+
+        emit CrossChainMessageExecuted(currentMessageId, msg.data);
+        emit OwnerUpdated(oldOwner, newOwner);
     }
 
     /**********************************************************************************************
@@ -302,11 +338,12 @@ contract HyperlaneLeafPlugin is TokentrollerV1 {
     /**********************************************************************************************
      * @dev Adds a new metadata field via cross-chain message
      * @param name The name of the metadata field to add
+     * @param isRequired Whether the field should be required
      * @notice This function can only be called by the root chain
      * @notice Emits CrossChainMessageExecuted on success or CrossChainMessageFailed on failure
      *********************************************************************************************/
-    function executeAddMetadataField(string calldata name) external onlyFromRoot crossChainContext {
-        try TokenMetadata(tokenMetadata).addField(name) {
+    function executeAddMetadataField(string calldata name, bool isRequired) external onlyFromRoot crossChainContext {
+        try TokenMetadata(tokenMetadata).addField(name, isRequired) {
             emit CrossChainMessageExecuted(currentMessageId, msg.data);
         } catch Error(string memory reason) {
             emit CrossChainMessageFailed(currentMessageId, reason);
