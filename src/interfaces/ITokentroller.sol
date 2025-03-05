@@ -32,7 +32,6 @@ interface ITokentroller {
     function canUpdateMetadata(address sender, address contractAddress) external view returns (bool);
 
     function updateOwner(address newOwner) external;
-    function updateMetadataTokentroller(address newTokentroller) external;
     function updateRegistryTokentroller(address newTokentroller) external;
     function addTrustedHelper(address helper) external;
     function removeTrustedHelper(address helper) external;

@@ -8,13 +8,20 @@ import "../src/TokenEdits.sol";
 import "../src/interfaces/ISharedTypes.sol";
 
 contract GasEstimator is Script {
-    function createTokenEdit(address tokenEdits, address token) internal {
-        // Create a test edit
+    function createTokenEdits(address tokenEdits, address token) internal {
+        // Create 10 different edits for logo
         MetadataInput[] memory metadata = new MetadataInput[](1);
-        metadata[0] = MetadataInput({ field: "logoURI", value: "https://example.com/new_logo.png" });
 
-        // Propose the edit
-        TokenEdits(tokenEdits).proposeEdit(token, metadata);
+        // Create and propose 10 different edits
+        for (uint i = 0; i < 10; i++) {
+            metadata[0] = MetadataInput({
+                field: "logoURI",
+                value: string(abi.encodePacked("https://example.com/logo_", vm.toString(i), ".png"))
+            });
+
+            // Propose each edit
+            TokenEdits(tokenEdits).proposeEdit(token, metadata);
+        }
     }
 
     function approveTokenIfNeeded(address leafPlugin, address token) internal {
@@ -100,9 +107,7 @@ contract GasEstimator is Script {
 
         // Create an edit
         address tokenEdits = HyperlaneLeafPlugin(leafPlugin).tokenEdits();
-        createTokenEdit(tokenEdits, token);
-        createTokenEdit(tokenEdits, token);
-        createTokenEdit(tokenEdits, token);
+        createTokenEdits(tokenEdits, token);
 
         // Continue with existing estimation logic
         IMailbox mailbox = HyperlaneLeafPlugin(leafPlugin).mailbox();
@@ -131,7 +136,7 @@ contract GasEstimator is Script {
 
         // Create an edit
         address tokenEdits = HyperlaneLeafPlugin(leafPlugin).tokenEdits();
-        createTokenEdit(tokenEdits, token);
+        createTokenEdits(tokenEdits, token);
 
         // Continue with existing estimation logic
         IMailbox mailbox = HyperlaneLeafPlugin(leafPlugin).mailbox();
@@ -154,9 +159,13 @@ contract GasEstimator is Script {
         return gasUsed;
     }
 
-    function estimateExecuteAddMetadataField(address leafPlugin, string calldata name) external returns (uint256) {
+    function estimateExecuteAddMetadataField(
+        address leafPlugin,
+        string calldata name,
+        bool isRequired
+    ) external returns (uint256) {
         IMailbox mailbox = HyperlaneLeafPlugin(leafPlugin).mailbox();
-        bytes memory message = abi.encodeWithSignature("executeAddMetadataField(string)", name);
+        bytes memory message = abi.encodeWithSignature("executeAddMetadataField(string,bool)", name, isRequired);
 
         uint32 origin = 1;
         bytes32 sender = bytes32(uint256(uint160(HyperlaneLeafPlugin(leafPlugin).root())));
@@ -176,32 +185,20 @@ contract GasEstimator is Script {
         bool isActive,
         bool isRequired
     ) external returns (uint256) {
-        // First add the field if it doesn't exist
         IMailbox mailbox = HyperlaneLeafPlugin(leafPlugin).mailbox();
-        bytes memory addMessage = abi.encodeWithSignature("executeAddMetadataField(string)", name);
-
-        uint32 origin = 1;
-        bytes32 sender = bytes32(uint256(uint160(HyperlaneLeafPlugin(leafPlugin).root())));
-
-        // Add the field first
-        vm.prank(address(mailbox));
-        try HyperlaneLeafPlugin(leafPlugin).handle(origin, sender, addMessage) {
-            // Field was added successfully
-        } catch {
-            // Field might already exist, continue with update
-        }
-
-        // Now update the field
-        bytes memory updateMessage = abi.encodeWithSignature(
+        bytes memory message = abi.encodeWithSignature(
             "executeUpdateMetadataField(string,bool,bool)",
             name,
             isActive,
             isRequired
         );
 
+        uint32 origin = 1;
+        bytes32 sender = bytes32(uint256(uint160(HyperlaneLeafPlugin(leafPlugin).root())));
+
         vm.startPrank(address(mailbox));
         uint256 startGas = gasleft();
-        HyperlaneLeafPlugin(leafPlugin).handle(origin, sender, updateMessage);
+        HyperlaneLeafPlugin(leafPlugin).handle(origin, sender, message);
         uint256 gasUsed = startGas - gasleft();
         vm.stopPrank();
 
@@ -227,12 +224,25 @@ contract GasEstimator is Script {
         return gasUsed;
     }
 
-    function estimateExecuteUpdateMetadataTokentroller(
-        address leafPlugin,
-        address newTokentroller
-    ) external returns (uint256) {
+    function estimateUpdateTokenEdits(address leafPlugin, address newTokenEdits) external returns (uint256) {
         IMailbox mailbox = HyperlaneLeafPlugin(leafPlugin).mailbox();
-        bytes memory message = abi.encodeWithSignature("updateMetadataTokentroller(address)", newTokentroller);
+        bytes memory message = abi.encodeWithSignature("updateTokenEdits(address)", newTokenEdits);
+
+        uint32 origin = 1;
+        bytes32 sender = bytes32(uint256(uint160(HyperlaneLeafPlugin(leafPlugin).root())));
+
+        vm.startPrank(address(mailbox));
+        uint256 startGas = gasleft();
+        HyperlaneLeafPlugin(leafPlugin).handle(origin, sender, message);
+        uint256 gasUsed = startGas - gasleft();
+        vm.stopPrank();
+
+        return gasUsed;
+    }
+
+    function estimateUpdateOwner(address leafPlugin, address newOwner) external returns (uint256) {
+        IMailbox mailbox = HyperlaneLeafPlugin(leafPlugin).mailbox();
+        bytes memory message = abi.encodeWithSignature("updateOwner(address)", newOwner);
 
         uint32 origin = 1;
         bytes32 sender = bytes32(uint256(uint160(HyperlaneLeafPlugin(leafPlugin).root())));
